@@ -33,13 +33,9 @@
 
 #include <QRubberBand>
 
-#ifdef Q_OS_LINUX
 #include <QDockWidget>
-#define tFloatingWidgetBase QDockWidget
-#else
 #include <QWidget>
-#define tFloatingWidgetBase QWidget
-#endif
+#define tFloatingWidgetBase QDockWidget
 
 class CDockingStateReader;
 
@@ -185,11 +181,9 @@ protected: // reimplements QWidget
 	virtual void moveEvent(QMoveEvent *event) override;
 #endif
 
-#ifdef Q_OS_LINUX
 	virtual void moveEvent(QMoveEvent *event) override;
 	virtual void resizeEvent(QResizeEvent *event) override;
 	virtual bool event(QEvent *e) override;
-#endif
 
 #ifdef Q_OS_WIN
 	/**
@@ -264,7 +258,7 @@ public:
 	 */
 	void hideAndDeleteLater();
 
-#ifdef Q_OS_LINUX
+//#ifdef Q_OS_LINUX
     /**
 	 * This is a function that responds to FloatingWidgetTitleBar::maximizeRequest()
 	 * Maximize or normalize the container size.
@@ -299,7 +293,7 @@ public:
 	 * the floating widget has a QWidget based title bar
 	 */
 	bool hasNativeTitleBar();
-#endif
+//#endif
 
 }; // class FloatingDockContainer
 }

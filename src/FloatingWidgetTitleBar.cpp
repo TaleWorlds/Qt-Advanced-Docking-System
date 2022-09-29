@@ -39,6 +39,7 @@
 
 #include "ads_globals.h"
 #include "ElidingLabel.h"
+#include "DockManager.h"
 #include "FloatingDockContainer.h"
 
 namespace ads
@@ -73,6 +74,12 @@ struct FloatingWidgetTitleBarPrivate
 	 * Creates the complete layout including all controls
 	 */
 	void createLayout();
+	
+	/**
+	 * Creates an incomplete layout including all controls, but allows the user to 
+	 * specify icons from stylesheet
+	 */
+	void createCustomLayout();
 };
 
 //============================================================================
@@ -81,26 +88,23 @@ void FloatingWidgetTitleBarPrivate::createLayout()
 	TitleLabel = new tTabLabel();
 	TitleLabel->setElideMode(Qt::ElideRight);
 	TitleLabel->setText("DockWidget->windowTitle()");
-	TitleLabel->setObjectName("floatingTitleLabel");
     TitleLabel->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
 
 	CloseButton = new tCloseButton();
-	CloseButton->setObjectName("floatingTitleCloseButton");
     CloseButton->setAutoRaise(true);
 
 	MaximizeButton = new tMaximizeButton();
-	MaximizeButton->setObjectName("floatingTitleMaximizeButton");
 	MaximizeButton->setAutoRaise(true);
 
 	// The standard icons do does not look good on high DPI screens
-	QIcon CloseIcon;
-	QPixmap normalPixmap = _this->style()->standardPixmap(
-	    QStyle::SP_TitleBarCloseButton, 0, CloseButton);
-	CloseIcon.addPixmap(normalPixmap, QIcon::Normal);
-	CloseIcon.addPixmap(internal::createTransparentPixmap(normalPixmap, 0.25),
-	    QIcon::Disabled);
-	CloseButton->setIcon(
-	    _this->style()->standardIcon(QStyle::SP_TitleBarCloseButton));
+ 	QIcon CloseIcon;
+ 	QPixmap normalPixmap = _this->style()->standardPixmap(
+ 	    QStyle::SP_TitleBarCloseButton, 0, CloseButton);
+ 	CloseIcon.addPixmap(normalPixmap, QIcon::Normal);
+ 	CloseIcon.addPixmap(internal::createTransparentPixmap(normalPixmap, 0.25),
+ 	    QIcon::Disabled);
+ 	CloseButton->setIcon(
+ 	    _this->style()->standardIcon(QStyle::SP_TitleBarCloseButton));
 	CloseButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
 	CloseButton->setVisible(true);
 	CloseButton->setFocusPolicy(Qt::NoFocus);
@@ -129,28 +133,100 @@ void FloatingWidgetTitleBarPrivate::createLayout()
 	TitleLabel->setVisible(true);
 }
 
+void FloatingWidgetTitleBarPrivate::createCustomLayout()
+{
+	TitleLabel = new tTabLabel();
+	TitleLabel->setElideMode(Qt::ElideRight);
+	TitleLabel->setText("DockWidget->windowTitle()");
+	TitleLabel->setObjectName("floatingTitleLabel");
+	TitleLabel->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+
+	CloseButton = new tCloseButton();
+	CloseButton->setObjectName("floatingTitleCloseButton");
+	CloseButton->setAutoRaise(true);
+
+	MaximizeButton = new tMaximizeButton();
+	MaximizeButton->setObjectName("floatingTitleMaximizeButton");
+	MaximizeButton->setAutoRaise(true);
+
+	// So icons may be provided from stylesheets using QToolButton#floatingTitleXButton{icon: ...}
+	CloseButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+	CloseButton->setVisible(true);
+	CloseButton->setFocusPolicy(Qt::NoFocus);
+	_this->connect(CloseButton, SIGNAL(clicked()), SIGNAL(closeRequested()));
+
+	MaximizeButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+	MaximizeButton->setVisible(true);
+	MaximizeButton->setFocusPolicy(Qt::NoFocus);
+	_this->connect(MaximizeButton, &QPushButton::clicked, _this, &CFloatingWidgetTitleBar::maximizeRequested);
+
+	QFontMetrics fm(TitleLabel->font());
+	int Spacing = qRound(fm.height() / 4.0);
+
+	// Fill the layout
+	QBoxLayout *Layout = new QBoxLayout(QBoxLayout::LeftToRight);
+	Layout->setContentsMargins(6, 0, 0, 0);
+	Layout->setSpacing(0);
+	_this->setLayout(Layout);
+	Layout->addWidget(TitleLabel, 1);
+	Layout->addSpacing(Spacing);
+	Layout->addWidget(MaximizeButton);
+	Layout->addWidget(CloseButton);
+	Layout->setAlignment(Qt::AlignCenter);
+
+	TitleLabel->setVisible(true);
+}
+
 //============================================================================
 CFloatingWidgetTitleBar::CFloatingWidgetTitleBar(CFloatingDockContainer *parent) :
     QFrame(parent),
 	d(new FloatingWidgetTitleBarPrivate(this))
 {
+	setObjectName("floatingTitleBar");
 	d->FloatingWidget = parent;
-	d->createLayout();
 
-    auto normalPixmap = this->style()->standardPixmap(QStyle::SP_TitleBarNormalButton, 0, d->MaximizeButton);
-    d->NormalIcon.addPixmap(normalPixmap, QIcon::Normal);
-    d->NormalIcon.addPixmap(internal::createTransparentPixmap(normalPixmap, 0.25), QIcon::Disabled);
+	if (CDockManager::testConfigFlag(CDockManager::FloatingContainerForceQWidgetTitleBar))
+	{
+		d->createLayout();
+	}
+	else if (CDockManager::testConfigFlag(CDockManager::FloatingContainerForceQWidgetCustomStyledTitleBar))
+	{
+		d->createCustomLayout();
+	}
+	setParent(parent);
+	if (CDockManager::testConfigFlag(CDockManager::FloatingContainerForceQWidgetTitleBar))
+	{
+		auto normalPixmap = this->style()->standardPixmap(QStyle::StandardPixmap::SP_TitleBarNormalButton, 0, d->MaximizeButton);
+		d->NormalIcon.addPixmap(normalPixmap, QIcon::Normal);
+		d->NormalIcon.addPixmap(internal::createTransparentPixmap(normalPixmap, 0.25), QIcon::Disabled);
 
-    auto maxPixmap = this->style()->standardPixmap(QStyle::SP_TitleBarMaxButton, 0, d->MaximizeButton);
-    d->MaximizeIcon.addPixmap(maxPixmap, QIcon::Normal);
-    d->MaximizeIcon.addPixmap(internal::createTransparentPixmap(maxPixmap, 0.25), QIcon::Disabled);
-    setMaximizedIcon(d->Maximized);
+		auto maxPixmap = this->style()->standardPixmap(QStyle::SP_TitleBarMaxButton, 0, d->MaximizeButton);
+		d->MaximizeIcon.addPixmap(maxPixmap, QIcon::Normal);
+		d->MaximizeIcon.addPixmap(internal::createTransparentPixmap(maxPixmap, 0.25), QIcon::Disabled);
+		setMaximizedIcon(d->Maximized);
+	}
+}
+
+
+CFloatingWidgetTitleBar::CFloatingWidgetTitleBar(int i)
+{
+	printf("%d", i);
 }
 
 //============================================================================
 CFloatingWidgetTitleBar::~CFloatingWidgetTitleBar()
 {
 	delete d;
+	d = nullptr;
+}
+
+//============================================================================
+void CFloatingWidgetTitleBar::setFloatingWidget(CFloatingDockContainer * parent)
+{
+	if (!d->FloatingWidget)
+	{
+		d->FloatingWidget = parent;
+	}
 }
 
 //============================================================================
@@ -282,6 +358,11 @@ QIcon CFloatingWidgetTitleBar::maximizeIcon() const
     return d->MaximizeIcon;
 }
 
+
+bool CFloatingWidgetTitleBar::maximized() const
+{
+	return d->Maximized;
+}
 
 //============================================================================
 QIcon CFloatingWidgetTitleBar::normalIcon() const

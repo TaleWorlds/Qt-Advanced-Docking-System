@@ -194,12 +194,20 @@ public:
 		FocusHighlighting = 0x200000, //!< enables styling of focused dock widget tabs or floating widget titlebar
 		EqualSplitOnInsertion = 0x400000, ///!< if enabled, the space is equally distributed to all widgets in a  splitter
 
-		FloatingContainerForceNativeTitleBar = 0x800000, //!< Linux only ! Forces all FloatingContainer to use the native title bar. This might break docking for FloatinContainer on some Window Managers (like Kwin/KDE).
+		FloatingContainerForceNativeTitleBar = 0x800000, //!< Forces all FloatingContainer to use the native title bar. This might break docking for FloatinContainer on some Window Managers (like Kwin/KDE).
 														 //!< If neither this nor FloatingContainerForceCustomTitleBar is set (the default) native titlebars are used except on known bad systems.
 														 //! Users can overwrite this by setting the environment variable ADS_UseNativeTitle to "1" or "0".
-        FloatingContainerForceQWidgetTitleBar = 0x1000000,//!< Linux only ! Forces all FloatingContainer to use a QWidget based title bar.
-														 //!< If neither this nor FloatingContainerForceNativeTitleBar is set (the default) native titlebars are used except on known bad systems.
-														 //! Users can overwrite this by setting the environment variable ADS_UseNativeTitle to "1" or "0".
+
+        FloatingContainerForceQWidgetTitleBar = 0x4000000, //!< Forces all FloatingContainer to use a QWidget based title bar.
+														   //!< If neither this nor FloatingContainerForceNativeTitleBar is set (the default) native titlebars
+														   //!< are used except on known bad systems.
+														   //! Users can overwrite this by setting the environment variable ADS_UseNativeTitle to "1" or "0".
+
+		FloatingContainerForceQWidgetCustomStyledTitleBar = 0x1000000, //!< This flag does the same functionality as FloatingContainerForceQWidgetTitleBar, and it
+																	   //!<allows the users to set their own styling if they are using QWidgetTitleBar using Stylesheets. If this
+																	   //!<flag is set, but the styling was not provided, Icons and buttons might not be seen. Currently, 
+																	   // qroperty-maximizeIcon: ..; syntax does not seem to work
+																	   
 		MiddleMouseButtonClosesTab = 0x2000000, //! If the flag is set, the user can use the mouse middle button to close the tab under the mouse
 
         DefaultDockAreaButtons = DockAreaHasCloseButton

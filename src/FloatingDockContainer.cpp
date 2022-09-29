@@ -52,8 +52,8 @@
 #pragma comment(lib, "User32.lib")
 #endif
 #endif
+#include "FloatingWidgetTitleBar.h"
 #ifdef Q_OS_LINUX
-#include "linux/FloatingWidgetTitleBar.h"
 #include <xcb/xcb.h>
 #endif
 
@@ -374,11 +374,9 @@ struct FloatingDockContainerPrivate
 	QPoint DragStartPos;
 	bool Hiding = false;
 	bool AutoHideChildren = true;
-#ifdef Q_OS_LINUX
     QWidget* MouseEventHandler = nullptr;
     CFloatingWidgetTitleBar* TitleBar = nullptr;
 	bool IsResizing = false;
-#endif
 
 	/**
 	 * Private data constructor
@@ -411,12 +409,10 @@ struct FloatingDockContainerPrivate
 
 	void setWindowTitle(const QString &Text)
 	{
-#ifdef Q_OS_LINUX
 		if (TitleBar)
 		{
 			TitleBar->setTitle(Text);
 		}
-#endif
 		_this->setWindowTitle(Text);
 	}
 
@@ -515,14 +511,12 @@ void FloatingDockContainerPrivate::updateDropOverlays(const QPoint &GlobalPos)
 		return;
 	}
 
-#ifdef Q_OS_LINUX
-	// Prevent display of drop overlays and docking as long as a model dialog
+	// Prevent display of drop overlays and docking as long as a modal dialog
 	// is active
     if (qApp->activeModalWidget())
     {
         return;
     }
-#endif
 
 	auto Containers = DockManager->dockContainers();
 	CDockContainerWidget *TopContainer = nullptr;
@@ -616,13 +610,12 @@ CFloatingDockContainer::CFloatingDockContainer(CDockManager *DockManager) :
 	connect(d->DockContainer, SIGNAL(dockAreasRemoved()), this,
 	    SLOT(onDockAreasAddedOrRemoved()));
 
-#ifdef Q_OS_LINUX
 	QDockWidget::setWidget(d->DockContainer);
 	QDockWidget::setFloating(true);
 	QDockWidget::setFeatures(QDockWidget::DockWidgetClosable
 		| QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable);
 
-	bool native_window = true;
+	bool native_window = true; 
 
 	// FloatingContainerForce*TitleBar is overwritten by the "ADS_UseNativeTitle" environment variable if set.
 	auto env = qgetenv("ADS_UseNativeTitle").toUpper();
@@ -638,15 +631,18 @@ CFloatingDockContainer::CFloatingDockContainer(CDockManager *DockManager) :
 	{
 		native_window = true;
 	}
-	else if (DockManager->testConfigFlag(CDockManager::FloatingContainerForceQWidgetTitleBar))
+	else if (DockManager->testConfigFlag(CDockManager::FloatingContainerForceQWidgetTitleBar)
+		|| DockManager->testConfigFlag(CDockManager::FloatingContainerForceQWidgetCustomStyledTitleBar))
 	{
 		native_window = false;
 	}
 	else
 	{
-		// KDE doesn't seem to fire MoveEvents while moving windows, so for now no native titlebar for everything using KWin.
-		QString window_manager = internal::windowManager().toUpper().split(" ")[0];
-                native_window = window_manager != "KWIN";
+		#ifdef Q_OS_LINUX
+			// KDE doesn't seem to fire MoveEvents while moving windows, so for now no native title bar for everything using KWin.
+			QString window_manager = internal::windowManager().toUpper().split(" ")[0];
+					native_window = window_manager != "KWIN";
+		#endif
 	}
 
 	if (native_window)
@@ -656,23 +652,25 @@ CFloatingDockContainer::CFloatingDockContainer(CDockManager *DockManager) :
 	}
 	else
 	{
+		setWindowFlags(Qt::Window | Qt::WindowMinMaxButtonsHint | Qt::FramelessWindowHint);
 		d->TitleBar = new CFloatingWidgetTitleBar(this);
 		setTitleBarWidget(d->TitleBar);
-		setWindowFlags(Qt::Window | Qt::WindowMinMaxButtonsHint | Qt::FramelessWindowHint);
 		d->TitleBar->enableCloseButton(isClosable());
 		connect(d->TitleBar, SIGNAL(closeRequested()), SLOT(close()));
 		connect(d->TitleBar, &CFloatingWidgetTitleBar::maximizeRequested,
 				this, &CFloatingDockContainer::onMaximizeRequest);
 	}
-#else
-	setWindowFlags(
-	    Qt::Window | Qt::WindowMaximizeButtonHint | Qt::WindowCloseButtonHint);
-	QBoxLayout *l = new QBoxLayout(QBoxLayout::TopToBottom);
-	l->setContentsMargins(0, 0, 0, 0);
-	l->setSpacing(0);
-	setLayout(l);
-	l->addWidget(d->DockContainer);
-#endif
+
+	if (native_window)
+	{
+		setWindowFlags(
+			Qt::Window | Qt::WindowMaximizeButtonHint | Qt::WindowCloseButtonHint);
+		QBoxLayout *l = new QBoxLayout(QBoxLayout::TopToBottom);
+		l->setContentsMargins(0, 0, 0, 0);
+		l->setSpacing(0);
+		setLayout(l);
+		l->addWidget(d->DockContainer);
+	}
 
 	DockManager->registerFloatingWidget(this);
 }
@@ -682,7 +680,6 @@ CFloatingDockContainer::CFloatingDockContainer(CDockAreaWidget *DockArea) :
 	CFloatingDockContainer(DockArea->dockManager())
 {
 	d->DockContainer->addDockArea(DockArea);
-
     auto TopLevelDockWidget = topLevelDockWidget();
     if (TopLevelDockWidget)
     {
@@ -702,7 +699,6 @@ CFloatingDockContainer::CFloatingDockContainer(CDockWidget *DockWidget) :
     {
     	TopLevelDockWidget->emitTopLevelChanged(true);
     }
-
     d->DockManager->notifyWidgetOrAreaRelocation(DockWidget);
 }
 
@@ -732,13 +728,11 @@ void CFloatingDockContainer::changeEvent(QEvent *event)
 		ADS_PRINT("FloatingWidget::changeEvent QEvent::ActivationChange ");
 		d->zOrderIndex = ++zOrderCounter;
 
-#ifdef Q_OS_LINUX
 		if (d->DraggingState == DraggingFloatingWidget)
 		{
 			d->titleMouseReleaseEvent();
 			d->DraggingState = DraggingInactive;
 		}
-#endif
 	}
 }
 
@@ -884,12 +878,10 @@ void CFloatingDockContainer::hideEvent(QHideEvent *event)
 void CFloatingDockContainer::showEvent(QShowEvent *event)
 {
 	Super::showEvent(event);
-#ifdef Q_OS_LINUX
     if (CDockManager::testConfigFlag(CDockManager::FocusHighlighting))
     {
         this->window()->activateWindow();
     }
-#endif
 }
 
 
@@ -897,7 +889,6 @@ void CFloatingDockContainer::showEvent(QShowEvent *event)
 void CFloatingDockContainer::startFloating(const QPoint &DragStartMousePos,
     const QSize &Size, eDragState DragState, QWidget *MouseEventHandler)
 {
-#ifdef Q_OS_LINUX
     if (!isMaximized())
     {
 		resize(Size);
@@ -918,14 +909,6 @@ void CFloatingDockContainer::startFloating(const QPoint &DragStartMousePos,
 		moveFloating();
 	}
 	show();
-#else
-    Q_UNUSED(MouseEventHandler)
-	resize(Size);
-	d->DragStartMousePosition = DragStartMousePos;
-	d->setState(DragState);
-	moveFloating();
-	show();
-#endif
 }
 
 //============================================================================
@@ -1034,12 +1017,10 @@ bool CFloatingDockContainer::restoreState(CDockingStateReader &Stream,
 		return false;
 	}
 	onDockAreasAddedOrRemoved();
-#ifdef Q_OS_LINUX
 	if(d->TitleBar)
 	{
 		d->TitleBar->setMaximizedIcon(windowState() == Qt::WindowMaximized);
 	}
-#endif
 	return true;
 }
 
@@ -1078,7 +1059,6 @@ void CFloatingDockContainer::hideAndDeleteLater()
 void CFloatingDockContainer::finishDragging()
 {
 	ADS_PRINT("CFloatingDockContainer::finishDragging");
-#ifdef Q_OS_LINUX
 	setWindowOpacity(1);
 	activateWindow();
 	if (d->MouseEventHandler)
@@ -1086,7 +1066,6 @@ void CFloatingDockContainer::finishDragging()
 	   d->MouseEventHandler->releaseMouse();
 	   d->MouseEventHandler = nullptr;
 	}
-#endif
 	d->titleMouseReleaseEvent();
 }
 
@@ -1193,7 +1172,6 @@ void CFloatingDockContainer::moveEvent(QMoveEvent *event)
 #endif
 
 
-#ifdef Q_OS_LINUX
 //============================================================================
 void CFloatingDockContainer::onMaximizeRequest()
 {
@@ -1249,8 +1227,10 @@ bool CFloatingDockContainer::isMaximized() const
 void CFloatingDockContainer::show()
 {
 	// Prevent this window from showing in the taskbar and pager (alt+tab)
+#ifdef Q_OS_LINUX
 	internal::xcb_add_prop(true, winId(), "_NET_WM_STATE", "_NET_WM_STATE_SKIP_TASKBAR");
 	internal::xcb_add_prop(true, winId(), "_NET_WM_STATE", "_NET_WM_STATE_SKIP_PAGER");
+#endif
 	Super::show();
 }
 
@@ -1298,7 +1278,6 @@ bool CFloatingDockContainer::hasNativeTitleBar()
 {
 	return d->TitleBar == nullptr;
 }
-#endif
 
 } // namespace ads
 

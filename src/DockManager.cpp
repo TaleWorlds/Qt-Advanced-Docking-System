@@ -58,9 +58,7 @@
 #include "DockFocusController.h"
 #include "DockSplitter.h"
 
-#ifdef Q_OS_LINUX
-#include "linux/FloatingWidgetTitleBar.h"
-#endif
+//#include "FloatingWidgetTitleBar.h"
 
 
 /**
@@ -112,7 +110,6 @@ struct DockManagerPrivate
 	QVector<CFloatingDockContainer*> UninitializedFloatingWidgets;
 	CDockFocusController* FocusController = nullptr;
     CDockWidget* CentralWidget = nullptr;
-
 	/**
 	 * Private data constructor
 	 */
@@ -499,7 +496,7 @@ CDockManager::CDockManager(QWidget *parent) :
 		d->FocusController = new CDockFocusController(this);
 	}
 
-#ifdef Q_OS_LINUX
+/*#ifdef Q_OS_LINUX*/
 	window()->installEventFilter(this);
 
     connect(qApp, &QApplication::focusWindowChanged, [](QWindow* focusWindow)
@@ -511,7 +508,7 @@ CDockManager::CDockManager(QWidget *parent) :
             focusWindow->raise();
         }
     });
-#endif
+/*#endif*/
 }
 
 //============================================================================
@@ -561,7 +558,7 @@ bool CDockManager::eventFilter(QObject *obj, QEvent *e)
             if(QGuiApplication::platformName() == QLatin1String("xcb"))
 			{
 				internal::xcb_update_prop(true, _window->window()->winId(),
-                    "_NET_WM_STATE", "_NET_WM_STATE_ABOVE", "_NET_WM_STATE_STAYS_ON_TOP");
+					"_NET_WM_STATE", "_NET_WM_STATE_ABOVE", "_NET_WM_STATE_STAYS_ON_TOP");
 			}
 			else
 			{
@@ -580,8 +577,10 @@ bool CDockManager::eventFilter(QObject *obj, QEvent *e)
 
             if(QGuiApplication::platformName() == QLatin1String("xcb"))
 			{
+				#ifdef Q_OS_LINUX
 				internal::xcb_update_prop(false, _window->window()->winId(),
-                    "_NET_WM_STATE", "_NET_WM_STATE_ABOVE", "_NET_WM_STATE_STAYS_ON_TOP");
+					"_NET_WM_STATE", "_NET_WM_STATE_ABOVE", "_NET_WM_STATE_STAYS_ON_TOP");
+				#endif
 			}
             else
 			{
