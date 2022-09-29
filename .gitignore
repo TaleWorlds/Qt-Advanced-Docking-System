@@ -384,3 +384,12 @@ FodyWeavers.xsd
 /Settings.ini
 .vscode/settings.json
 /.settings
+/cmake/CMakeFiles
+/cmake/CMakeCache.txt
+
+mocs_*.cpp
+moc_*.cpp
+*.vcxproj
+*.vcxproj.filters
+*.user
+/examples/cmake
