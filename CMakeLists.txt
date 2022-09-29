@@ -4,6 +4,7 @@ cmake_minimum_required(VERSION 3.5)
 # we can override this behavior by explicitly setting ADS_VERSION and
 # skipping the git checks. This is useful for cases where this project is being
 # used independently of its original git repo (e.g. vendored in another project)
+# set(ADS_VERSION YOUR.VERSION.HERE)
 if(NOT ADS_VERSION)
     set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules ${CMAKE_MODULE_PATH})
     include(GetGitRevisionDescription)

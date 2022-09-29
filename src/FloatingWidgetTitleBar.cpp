@@ -319,14 +319,16 @@ void CFloatingWidgetTitleBar::mouseDoubleClickEvent(QMouseEvent *event)
 void CFloatingWidgetTitleBar::setMaximizedIcon(bool maximized)
 {
     d->Maximized = maximized;
-    if (maximized)
-    {
-        d->MaximizeButton->setIcon(d->NormalIcon);
-    }
-    else
-    {
-        d->MaximizeButton->setIcon(d->MaximizeIcon);
-    }
+	if (!CDockManager::testConfigFlag(CDockManager::FloatingContainerForceQWidgetCustomStyledTitleBar)) {
+		if (maximized)
+		{
+			d->MaximizeButton->setIcon(d->NormalIcon);
+		}
+		else
+		{
+			d->MaximizeButton->setIcon(d->MaximizeIcon);
+		}
+	}
 }
 
 
