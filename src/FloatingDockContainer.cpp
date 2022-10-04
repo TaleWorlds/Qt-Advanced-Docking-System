@@ -39,6 +39,7 @@
 #include <QAbstractButton>
 #include <QElapsedTimer>
 #include <QTime>
+#include <QStatusBar>
 
 #include "DockContainerWidget.h"
 #include "DockAreaWidget.h"
@@ -377,6 +378,7 @@ struct FloatingDockContainerPrivate
     QWidget* MouseEventHandler = nullptr;
     CFloatingWidgetTitleBar* TitleBar = nullptr;
 	bool IsResizing = false;
+	QStatusBar StatusBar;
 
 	/**
 	 * Private data constructor
@@ -610,6 +612,16 @@ CFloatingDockContainer::CFloatingDockContainer(CDockManager *DockManager) :
 	connect(d->DockContainer, SIGNAL(dockAreasRemoved()), this,
 	    SLOT(onDockAreasAddedOrRemoved()));
 
+	// Add a size grip to the floating windows - if they are frameless
+	if (DockManager->testConfigFlag(CDockManager::FloatingContainerForceQWidgetTitleBar)
+		|| DockManager->testConfigFlag(CDockManager::FloatingContainerForceQWidgetCustomStyledTitleBar))
+	{
+		d->StatusBar;
+		d->StatusBar.setSizeGripEnabled(true);
+		d->StatusBar.setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);
+		d->StatusBar.setContentsMargins(0, 0, 0, 0);
+		d->StatusBar.setFixedHeight(10);
+	}
 	QDockWidget::setWidget(d->DockContainer);
 	QDockWidget::setFloating(true);
 	QDockWidget::setFeatures(QDockWidget::DockWidgetClosable
@@ -659,6 +671,7 @@ CFloatingDockContainer::CFloatingDockContainer(CDockManager *DockManager) :
 		connect(d->TitleBar, SIGNAL(closeRequested()), SLOT(close()));
 		connect(d->TitleBar, &CFloatingWidgetTitleBar::maximizeRequested,
 				this, &CFloatingDockContainer::onMaximizeRequest);
+		d->DockContainer->layout()->addWidget(&d->StatusBar);
 	}
 
 	if (native_window)
