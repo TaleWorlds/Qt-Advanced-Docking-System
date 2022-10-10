@@ -380,6 +380,7 @@ CDockAreaWidget::CDockAreaWidget(CDockManager* DockManager, CDockContainerWidget
 	{
 		Q_EMIT d->DockManager->dockAreaCreated(this);
 	}
+	setSizePolicy(QSizePolicy::Policy::Minimum, QSizePolicy::Policy::Minimum);
 }
 
 //============================================================================
