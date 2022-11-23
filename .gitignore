@@ -393,3 +393,4 @@ moc_*.cpp
 *.vcxproj.filters
 *.user
 /examples/cmake
+/cmake
