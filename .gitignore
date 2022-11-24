@@ -394,3 +394,4 @@ moc_*.cpp
 *.user
 /examples/cmake
 /cmake
+/out/build/x64-Debug

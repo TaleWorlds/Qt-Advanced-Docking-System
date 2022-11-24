@@ -232,7 +232,14 @@ namespace ads
 	void DockWidgetTabPrivate::createLayout()
 	{
 		TitleLabel = new tTabLabel();
-		TitleLabel->setElideMode(Qt::ElideRight);
+		if (CDockManager::testConfigFlag(CDockManager::DockWidgetTabElidingEnabled))
+		{
+			TitleLabel->setElideMode(Qt::ElideRight);
+		}
+		else
+		{
+			TitleLabel->setElideMode(Qt::ElideNone);
+		}
 		TitleLabel->setText(DockWidget->windowTitle());
 		TitleLabel->setObjectName("dockWidgetTabLabel");
 		TitleLabel->setAlignment(Qt::AlignCenter);
@@ -334,7 +341,7 @@ namespace ads
 
 
 	//============================================================================
-	CDockWidgetTab::CDockWidgetTab(CDockWidget* DockWidget, QWidget *parent) :
+	CDockWidgetTab::CDockWidgetTab(CDockWidget* DockWidget, QWidget* parent) :
 		QFrame(parent),
 		d(new DockWidgetTabPrivate(this))
 	{
@@ -640,7 +647,7 @@ namespace ads
 
 
 	//============================================================================
-	void CDockWidgetTab::mouseDoubleClickEvent(QMouseEvent *event)
+	void CDockWidgetTab::mouseDoubleClickEvent(QMouseEvent* event)
 	{
 		if (event->button() == Qt::LeftButton)
 		{
@@ -705,7 +712,7 @@ namespace ads
 
 
 	//============================================================================
-	bool CDockWidgetTab::event(QEvent *e)
+	bool CDockWidgetTab::event(QEvent* e)
 	{
 #ifndef QT_NO_TOOLTIP
 		if (e->type() == QEvent::ToolTipChange)

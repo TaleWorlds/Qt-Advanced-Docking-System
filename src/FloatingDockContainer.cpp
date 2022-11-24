@@ -616,16 +616,15 @@ namespace ads
 		if (DockManager->testConfigFlag(CDockManager::FloatingContainerForceQWidgetTitleBar)
 			|| DockManager->testConfigFlag(CDockManager::FloatingContainerForceQWidgetCustomStyledTitleBar))
 		{
-			d->StatusBar;
-			d->StatusBar.setSizeGripEnabled(true);
+			d->StatusBar.setObjectName("floatingWidgetStatusBar");
 			d->StatusBar.setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);
 			d->StatusBar.setContentsMargins(0, 0, 0, 0);
 			d->StatusBar.setFixedHeight(10);
 		}
-		QDockWidget::setWidget(d->DockContainer);
-		QDockWidget::setFloating(true);
-		QDockWidget::setFeatures(QDockWidget::DockWidgetClosable
-			| QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable);
+		tFloatingWidgetBase::setWidget(d->DockContainer);
+		tFloatingWidgetBase::setFloating(true);
+		tFloatingWidgetBase::setFeatures(tFloatingWidgetBase::DockWidgetClosable
+			| tFloatingWidgetBase::DockWidgetMovable | tFloatingWidgetBase::DockWidgetFloatable);
 
 		bool native_window = true;
 

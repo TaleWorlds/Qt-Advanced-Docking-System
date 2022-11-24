@@ -16,6 +16,7 @@
 #include <QSettings>
 #include <QMessageBox>
 #include <QPlainTextEdit>
+#include <QSaveFile>
 #include <QToolBar>
 #include "DockAreaWidget.h"
 #include "DockAreaTitleBar.h"
@@ -26,70 +27,76 @@ using namespace ads;
 
 // Created a simple example for frameless titled dock widgets
 
-CMainWindow::CMainWindow(QWidget *parent)
-    : QMainWindow(parent)
-    , ui(new Ui::CMainWindow)
+CMainWindow::CMainWindow(QWidget* parent)
+	: QMainWindow(parent)
+	, ui(new Ui::CMainWindow)
 {
-    ui->setupUi(this);
-    CDockManager::setConfigFlag(CDockManager::OpaqueSplitterResize, true);
-    CDockManager::setConfigFlag(CDockManager::XmlCompressionEnabled, false);
+	ui->setupUi(this);
+	CDockManager::setConfigFlag(CDockManager::OpaqueSplitterResize, true);
+	CDockManager::setConfigFlag(CDockManager::XmlCompressionEnabled, false);
 	CDockManager::setConfigFlag(CDockManager::FocusHighlighting, true);
-	// only need this for removing native title bar
- 	 CDockManager::setConfigFlag(CDockManager::FloatingContainerForceQWidgetTitleBar, true);
-	// Styling currently can't be done using style-sheets, if below code is commented out, and above is 
-	// commented, the icons wont be visible
-	// CDockManager::setConfigFlag(CDockManager::FloatingContainerForceQWidgetCustomStyledTitleBar, true);
-	// setStyleSheet("#floatingTitleBar[maximized=\"true\" { qproperty-maximizeIcon: url(:/ads/images/close-button.svg), url(:/ads/images/close-button_disabled.svg) disabled;}]");
-    DockManager = new CDockManager(this);
+	// only need this for removing native title bar - this demo also tests styling from stylesheet for the title bar
+	CDockManager::setConfigFlag(CDockManager::FloatingContainerForceQWidgetCustomStyledTitleBar, true);
+	setStyleSheet("#floatingTitleBar[maximized=\"true\" { qproperty-maximizeIcon: url(:/ads/images/close-button.svg), url(:/ads/images/close-button_disabled.svg) disabled;}]");
+	DockManager = new CDockManager(this);
 
-    // Set central widget
-    QPlainTextEdit* w = new QPlainTextEdit();
+	// Set central widget
+	QPlainTextEdit* w = new QPlainTextEdit();
 	w->setPlaceholderText("This is the central editor. Enter your text here.");
-    CDockWidget* CentralDockWidget = new CDockWidget("CentralWidget");
-    CentralDockWidget->setWidget(w);
-    auto* CentralDockArea = DockManager->setCentralWidget(CentralDockWidget);
-    CentralDockArea->setAllowedAreas(DockWidgetArea::OuterDockAreas);
+	CDockWidget* CentralDockWidget = new CDockWidget("CentralWidget");
+	CentralDockWidget->setWidget(w);
+	auto* CentralDockArea = DockManager->setCentralWidget(CentralDockWidget);
+	CentralDockArea->setAllowedAreas(DockWidgetArea::OuterDockAreas);
 
-    // create other dock widgets
-    QTableWidget* table = new QTableWidget();
-    table->setColumnCount(3);
-    table->setRowCount(10);
-    CDockWidget* TableDockWidget = new CDockWidget("Table 1");
+	// create other dock widgets
+	QTableWidget* table = new QTableWidget();
+	table->setColumnCount(3);
+	table->setRowCount(10);
+	CDockWidget* TableDockWidget = new CDockWidget("Table 1");
 	TableDockWidget->setWidget(table);
-    TableDockWidget->setMinimumSizeHintMode(CDockWidget::MinimumSizeHintFromDockWidget);
-    TableDockWidget->resize(250, 150);
-    TableDockWidget->setMinimumSize(200,150);
+	TableDockWidget->setMinimumSizeHintMode(CDockWidget::MinimumSizeHintFromDockWidget);
+	TableDockWidget->resize(250, 150);
+	TableDockWidget->setMinimumSize(200, 150);
 	auto TableArea = DockManager->addDockWidget(DockWidgetArea::LeftDockWidgetArea, TableDockWidget);
-    ui->menuView->addAction(TableDockWidget->toggleViewAction());
+	ui->menuView->addAction(TableDockWidget->toggleViewAction());
 
-    table = new QTableWidget();
-    table->setColumnCount(5);
-    table->setRowCount(1020);
-    TableDockWidget = new CDockWidget("Table 2");
+	table = new QTableWidget();
+	table->setColumnCount(5);
+	table->setRowCount(1020);
+	TableDockWidget = new CDockWidget("Table 2");
 	TableDockWidget->setWidget(table);
-    TableDockWidget->setMinimumSizeHintMode(CDockWidget::MinimumSizeHintFromDockWidget);
-    TableDockWidget->resize(250, 150);
-    TableDockWidget->setMinimumSize(200,150);
+	TableDockWidget->setMinimumSizeHintMode(CDockWidget::MinimumSizeHintFromDockWidget);
+	TableDockWidget->resize(250, 150);
+	TableDockWidget->setMinimumSize(200, 150);
 	DockManager->addDockWidget(DockWidgetArea::BottomDockWidgetArea, TableDockWidget, TableArea);
-    ui->menuView->addAction(TableDockWidget->toggleViewAction());
+	ui->menuView->addAction(TableDockWidget->toggleViewAction());
 
-    QTableWidget* propertiesTable = new QTableWidget();
-    propertiesTable->setColumnCount(3);
-    propertiesTable->setRowCount(10);
+	QTableWidget* propertiesTable = new QTableWidget();
+	propertiesTable->setColumnCount(3);
+	propertiesTable->setRowCount(10);
 	CDockWidget* PropertiesDockWidget = new CDockWidget("Properties");
 	PropertiesDockWidget->setWidget(propertiesTable);
-    PropertiesDockWidget->setMinimumSizeHintMode(CDockWidget::MinimumSizeHintFromDockWidget);
-    PropertiesDockWidget->resize(250, 150);
-    PropertiesDockWidget->setMinimumSize(200,150);
+	PropertiesDockWidget->setMinimumSizeHintMode(CDockWidget::MinimumSizeHintFromDockWidget);
+	PropertiesDockWidget->resize(250, 150);
+	PropertiesDockWidget->setMinimumSize(200, 150);
 	DockManager->addDockWidget(DockWidgetArea::RightDockWidgetArea, PropertiesDockWidget, CentralDockArea);
-    ui->menuView->addAction(PropertiesDockWidget->toggleViewAction());
+	ui->menuView->addAction(PropertiesDockWidget->toggleViewAction());
 
-    createPerspectiveUi();
+	QByteArray example_state;
+	if (QFile::exists("example.xml"))
+	{
+		QFile state_file("example.xml");
+		state_file.open(QIODevice::ReadOnly);
+		example_state = state_file.readAll();
+		DockManager->restoreState(example_state);
+		state_file.close();
+	}
+	createPerspectiveUi();
 }
 
 CMainWindow::~CMainWindow()
 {
-    delete ui;
+	delete ui;
 }
 
 
@@ -129,9 +136,15 @@ void CMainWindow::savePerspective()
 //============================================================================
 void CMainWindow::closeEvent(QCloseEvent* event)
 {
-    // Delete dock manager here to delete all floating widgets. This ensures
-    // that all top level windows of the dock manager are properly closed
-    DockManager->deleteLater();
+	// Delete dock manager here to delete all floating widgets. This ensures
+	// that all top level windows of the dock manager are properly closed
+	QByteArray example_state;
+	example_state = DockManager->saveState();
+	QSaveFile file("example.xml");
+	file.open(QIODevice::WriteOnly);
+	file.write(example_state);
+	file.commit();
+	DockManager->deleteLater();
 	QMainWindow::closeEvent(event);
 }
 
