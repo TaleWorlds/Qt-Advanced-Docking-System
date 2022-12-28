@@ -138,7 +138,7 @@ namespace ads
 		/**
 		 * Show the floating widgets that has been created floating
 		 */
-		virtual void showEvent(QShowEvent *event) override;
+		virtual void showEvent(QShowEvent* event) override;
 
 		/**
 		 * Acces for the internal dock focus controller.
@@ -189,31 +189,32 @@ namespace ads
 			FloatingContainerHasWidgetTitle = 0x40000, //!< If set, the Floating Widget window title reflects the title of the current dock widget otherwise it displays application name as window title
 			FloatingContainerHasWidgetIcon = 0x80000, //!< If set, the Floating Widget icon reflects the icon of the current dock widget otherwise it displays application icon
 			HideSingleCentralWidgetTitleBar = 0x100000, //!< If there is only one single visible dock widget in the main dock container (the dock manager) and if this flag is set, then the titlebar of this dock widget will be hidden
-														//!< this only makes sense for non draggable and non floatable widgets and enables the creation of some kind of "central" widget
+			//!< this only makes sense for non draggable and non floatable widgets and enables the creation of some kind of "central" widget
 
 			FocusHighlighting = 0x200000, //!< enables styling of focused dock widget tabs or floating widget titlebar
 			EqualSplitOnInsertion = 0x400000, ///!< if enabled, the space is equally distributed to all widgets in a  splitter
 
 			FloatingContainerForceNativeTitleBar = 0x800000, //!< Forces all FloatingContainer to use the native title bar. This might break docking for FloatinContainer on some Window Managers (like Kwin/KDE).
-																										 //!< If neither this nor FloatingContainerForceCustomTitleBar is set (the default) native titlebars are used except on known bad systems.
-																										 //! Users can overwrite this by setting the environment variable ADS_UseNativeTitle to "1" or "0".
+			//!< If neither this nor FloatingContainerForceCustomTitleBar is set (the default) native titlebars are used except on known bad systems.
+			//! Users can overwrite this by setting the environment variable ADS_UseNativeTitle to "1" or "0".
 
 			FloatingContainerForceQWidgetTitleBar = 0x4000000, //!< Forces all FloatingContainer to use a QWidget based title bar.
-																//!< If neither this nor FloatingContainerForceNativeTitleBar is set (the default) native titlebars
-																//!< are used except on known bad systems.
-																//! Users can overwrite this by setting the environment variable ADS_UseNativeTitle to "1" or "0".
+			//!< If neither this nor FloatingContainerForceNativeTitleBar is set (the default) native titlebars
+			//!< are used except on known bad systems.
+			//! Users can overwrite this by setting the environment variable ADS_UseNativeTitle to "1" or "0".
 
 			FloatingContainerForceQWidgetCustomStyledTitleBar = 0x1000000, //!< This flag does the same functionality as FloatingContainerForceQWidgetTitleBar, and it
-																		   //!<allows the users to set their own styling if they are using QWidgetTitleBar using Stylesheets. If this
-																		   //!<flag is set, but the styling was not provided, Icons and buttons might not be seen. Currently, 
-																		   // qroperty-maximizeIcon: ..; syntax does not seem to work
+			//!<allows the users to set their own styling if they are using QWidgetTitleBar using Stylesheets. If this
+			//!<flag is set, but the styling was not provided, Icons and buttons might not be seen. Currently, 
+			// qroperty-maximizeIcon: ..; syntax does not seem to work
 
-			 MiddleMouseButtonClosesTab = 0x2000000, //! If the flag is set, the user can use the mouse middle button to close the tab under the mouse
-			 DoubleClickDoesNotFloatTab = 0x8000000, //! If the flag is set, the user will not be able to float a tab by double clicking on it
-
-			 DefaultDockAreaButtons = DockAreaHasCloseButton
-									| DockAreaHasUndockButton
-									| DockAreaHasTabsMenuButton,///< default configuration of dock area title bar buttons
+			MiddleMouseButtonClosesTab = 0x2000000, //! If the flag is set, the user can use the mouse middle button to close the tab under the mouse
+			DoubleClickDoesNotFloatTab = 0x8000000,		//! If the flag is set, the user will not be able to float a tab by double clicking on it
+			DockWidgetTabElidingEnabled = 0x10000000,
+			FloatingShadowEnabled = 0x20000000, // Shadow for floating dock container
+			DefaultDockAreaButtons = DockAreaHasCloseButton
+			| DockAreaHasUndockButton
+			| DockAreaHasTabsMenuButton,///< default configuration of dock area title bar buttons
 
 			DefaultBaseConfig = DefaultDockAreaButtons
 			| ActiveTabHasCloseButton
@@ -380,7 +381,7 @@ namespace ads
 		 * returns true.
 		 * \see saveState()
 		 */
-		bool restoreState(const QByteArray &state, int version = 0);
+		bool restoreState(const QByteArray& state, int version = 0);
 
 		/**
 		 * Saves the current perspective to the internal list of perspectives.
@@ -507,7 +508,7 @@ namespace ads
 		}
 
 #ifdef Q_OS_LINUX
-		bool eventFilter(QObject *obj, QEvent *e) override;
+		bool eventFilter(QObject* obj, QEvent* e) override;
 #endif
 
 		/**
@@ -524,7 +525,7 @@ namespace ads
 		 * If there is no splitter that contains the area, an empty list will be
 		 * returned.
 		 */
-		QList<int> splitterSizes(CDockAreaWidget *ContainedArea) const;
+		QList<int> splitterSizes(CDockAreaWidget* ContainedArea) const;
 
 		/**
 		 * Update the sizes of a splitter
@@ -535,7 +536,7 @@ namespace ads
 		 * the number of children of the splitter, this method will have no
 		 * effect.
 		 */
-		void setSplitterSizes(CDockAreaWidget *ContainedArea, const QList<int>& sizes);
+		void setSplitterSizes(CDockAreaWidget* ContainedArea, const QList<int>& sizes);
 
 	public Q_SLOTS:
 		/**
