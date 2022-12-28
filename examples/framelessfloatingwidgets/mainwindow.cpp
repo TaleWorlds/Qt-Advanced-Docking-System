@@ -35,7 +35,7 @@ CMainWindow::CMainWindow(QWidget* parent)
 	CDockManager::setConfigFlag(CDockManager::OpaqueSplitterResize, true);
 	CDockManager::setConfigFlag(CDockManager::XmlCompressionEnabled, false);
 	CDockManager::setConfigFlag(CDockManager::FocusHighlighting, true);
-	CDockManager::setConfigFlag(CDockManager::FloatingShadowEnabled, true);
+	CDockManager::setConfigFlag(CDockManager::FloatingShadowEnabled, false);
 	// only need this for removing native title bar - this demo also tests styling from stylesheet for the title bar
 	CDockManager::setConfigFlag(CDockManager::FloatingContainerForceQWidgetCustomStyledTitleBar, true);
 	CDockManager::setConfigFlag(CDockManager::FloatingContainerForceNativeTitleBar, false);
@@ -237,6 +237,7 @@ QStatusBar#floatingWidgetStatusBar
 	propertiesTable->setColumnCount(3);
 	propertiesTable->setRowCount(10);
 	CDockWidget* PropertiesDockWidget = new CDockWidget("Properties");
+	PropertiesDockWidget->setFeature(CDockWidget::DockWidgetIndependent, true);
 	PropertiesDockWidget->setWidget(propertiesTable);
 	PropertiesDockWidget->setMinimumSizeHintMode(CDockWidget::MinimumSizeHintFromDockWidget);
 	PropertiesDockWidget->resize(250, 150);

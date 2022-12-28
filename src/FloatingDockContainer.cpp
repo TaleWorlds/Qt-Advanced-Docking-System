@@ -611,7 +611,14 @@ namespace ads
 		this->installEventFilter(this);
 		m_bLeftPressed = false;
 		m_Direction = Direction::NONE;
-		m_iResizeRegionPadding = 10;
+		if (CDockManager::testConfigFlag(CDockManager::eConfigFlag::FloatingShadowEnabled))
+		{
+			m_iResizeRegionPadding = 10;
+		}
+		else
+		{
+			m_iResizeRegionPadding = 0;
+		}
 		hide();
 		d->DockManager = DockManager;
 		d->DockContainer = new CDockContainerWidget(DockManager, this);
@@ -711,6 +718,11 @@ namespace ads
 		auto TopLevelDockWidget = topLevelDockWidget();
 		if (TopLevelDockWidget)
 		{
+			if (TopLevelDockWidget->features().testFlag(CDockWidget::DockWidgetIndependent))
+			{
+				setParent(nullptr);
+				setWindowFlag(Qt::WindowStaysOnBottomHint, false);
+			}
 			TopLevelDockWidget->emitTopLevelChanged(true);
 		}
 
@@ -725,6 +737,11 @@ namespace ads
 		auto TopLevelDockWidget = topLevelDockWidget();
 		if (TopLevelDockWidget)
 		{
+			if (TopLevelDockWidget->features().testFlag(CDockWidget::DockWidgetIndependent))
+			{
+				setParent(nullptr);
+				setWindowFlag(Qt::WindowStaysOnBottomHint, false);
+			}
 			TopLevelDockWidget->emitTopLevelChanged(true);
 		}
 		d->DockManager->notifyWidgetOrAreaRelocation(DockWidget);
