@@ -393,3 +393,5 @@ moc_*.cpp
 *.vcxproj.filters
 *.user
 /examples/cmake
+/cmake
+/out/build/x64-Debug
