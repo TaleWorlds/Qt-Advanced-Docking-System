@@ -42,6 +42,7 @@
 #include <QStatusBar>
 #include <QScreen>
 #include <QGraphicsDropShadowEffect>
+#include <QWindow>
 
 #include "DockContainerWidget.h"
 #include "DockAreaWidget.h"
@@ -547,6 +548,17 @@ namespace ads
 		}
 
 		DropContainer = TopContainer;
+
+		if (DropContainer &&
+			(DropContainer->window()->isMinimized()
+				|| (DockManager->window()->isMinimized()
+					&& !DropContainer->topLevelDockWidget()->features().testFlag(CDockWidget::DockWidgetIndependent)
+					))
+			)
+		{
+			return;
+		}
+
 		auto ContainerOverlay = DockManager->containerOverlay();
 		auto DockAreaOverlay = DockManager->dockAreaOverlay();
 
@@ -681,6 +693,23 @@ namespace ads
 		}
 		else
 		{
+			if (CDockManager::testConfigFlag(CDockManager::eConfigFlag::FloatingShadowEnabled))
+			{
+				auto shadow_ = new QGraphicsDropShadowEffect(this);
+				setAttribute(Qt::WA_TranslucentBackground);
+				shadow_->setObjectName("floatingDockContainerShadow");
+				shadow_->setBlurRadius(m_iResizeRegionPadding);
+				shadow_->setOffset(0);
+				shadow_->setColor({ 0, 0, 0, 255 }); // black shadow
+				shadow_->setEnabled(true);
+				setGraphicsEffect(shadow_);
+				setAutoFillBackground(true);
+			}
+			else
+			{
+				this->setGraphicsEffect(nullptr);
+				d->DockContainer->layout()->addWidget(d->StatusBar);
+			}
 			tFloatingWidgetBase::setWidget(d->DockContainer);
 			tFloatingWidgetBase::setFloating(true);
 			tFloatingWidgetBase::setFeatures(tFloatingWidgetBase::DockWidgetClosable
@@ -692,20 +721,6 @@ namespace ads
 			connect(d->TitleBar, SIGNAL(closeRequested()), SLOT(close()));
 			connect(d->TitleBar, &CFloatingWidgetTitleBar::maximizeRequested,
 				this, &CFloatingDockContainer::onMaximizeRequest);
-			if (CDockManager::testConfigFlag(CDockManager::eConfigFlag::FloatingShadowEnabled))
-			{
-				//this->setAttribute(Qt::WA_TranslucentBackground); //-> needed, but DockAreaWidgets are not updated properly with this
-				auto shadow_ = new QGraphicsDropShadowEffect;
-				shadow_->setObjectName("floatingDockContainerShadow");
-				shadow_->setBlurRadius(m_iResizeRegionPadding);
-				shadow_->setOffset(0.0f);
-				shadow_->setColor({ 0, 0, 0, 255 }); // black shadow
-				this->setGraphicsEffect(shadow_);
-			}
-			else
-			{
-				d->DockContainer->layout()->addWidget(d->StatusBar);
-			}
 		}
 		DockManager->registerFloatingWidget(this);
 	}
@@ -720,8 +735,9 @@ namespace ads
 		{
 			if (TopLevelDockWidget->features().testFlag(CDockWidget::DockWidgetIndependent))
 			{
+				setWindowFlag(Qt::SubWindow, true);
 				setParent(nullptr);
-				setWindowFlag(Qt::WindowStaysOnBottomHint, false);
+				setFocusPolicy(Qt::FocusPolicy::ClickFocus);
 			}
 			TopLevelDockWidget->emitTopLevelChanged(true);
 		}
@@ -739,8 +755,9 @@ namespace ads
 		{
 			if (TopLevelDockWidget->features().testFlag(CDockWidget::DockWidgetIndependent))
 			{
+				setWindowFlag(Qt::SubWindow, true);
 				setParent(nullptr);
-				setWindowFlag(Qt::WindowStaysOnBottomHint, false);
+				setFocusPolicy(Qt::FocusPolicy::ClickFocus);
 			}
 			TopLevelDockWidget->emitTopLevelChanged(true);
 		}
@@ -962,7 +979,12 @@ namespace ads
 		int BorderSize = (frameSize().width() - size().width()) / 2;
 		const QPoint moveToPos = QCursor::pos() - d->DragStartMousePosition
 			- QPoint(BorderSize, 0);
+
+#if (QT_VERSION >= QT_VERSION_CHECK(5, 15, 0))
+		windowHandle()->startSystemMove();
+#else
 		move(moveToPos);
+#endif
 		switch (d->DraggingState)
 		{
 		case DraggingMousePressed:
@@ -997,6 +1019,8 @@ namespace ads
 	{
 		ADS_PRINT("CFloatingDockContainer::onDockAreasAddedOrRemoved()");
 		auto TopLevelDockArea = d->DockContainer->topLevelDockArea();
+		auto TopLevelDockWidget = d->DockContainer->topLevelDockWidget();
+
 		if (TopLevelDockArea || d->DockContainer->dockAreaCount() == 1)
 		{
 			d->SingleDockArea = TopLevelDockArea;
@@ -1021,6 +1045,17 @@ namespace ads
 			{
 				d->setWindowTitle(qApp->applicationDisplayName());
 				setWindowIcon(QApplication::windowIcon());
+			}
+		}
+		for (int i = 0; i < d->DockContainer->dockAreaCount(); i++)
+		{
+			auto DW = d->DockContainer->dockArea(i);
+			if (DW && DW->features().testFlag(CDockWidget::DockWidgetIndependent))
+			{
+				//  			setParent(nullptr);
+				// 			setWindowFlag(Qt::SubWindow);
+				// 			setFocusPolicy(Qt::FocusPolicy::ClickFocus);
+				break;
 			}
 		}
 	}
@@ -1113,6 +1148,7 @@ namespace ads
 		ADS_PRINT("CFloatingDockContainer::finishDragging");
 		setWindowOpacity(1);
 		activateWindow();
+
 		if (d->MouseEventHandler)
 		{
 			d->MouseEventHandler->releaseMouse();
@@ -1213,7 +1249,7 @@ namespace ads
 			// the main window as the active window for some reason. This fixes
 			// that by resetting the active window to the floating widget after
 			// updating the overlays.
-			QApplication::setActiveWindow(this);
+			QApplication::setActiveWindow(this->windowHandle());
 			break;
 		default:
 			break;
@@ -1291,7 +1327,45 @@ namespace ads
 	void CFloatingDockContainer::resizeEvent(QResizeEvent* event)
 	{
 		d->IsResizing = true;
+
+#if (QT_VERSION >= QT_VERSION_CHECK(5, 15, 0))
+		if (!isMaximized())
+		{
+			QPoint p;
+			if (d->MouseEventHandler)
+			{
+				p = d->MouseEventHandler->pos();
+			}
+			else
+			{
+				p = QCursor::pos();
+			}
+			Qt::Edges e = 0;
+			if (p.x <= 0)
+			{
+				e | Qt::Edge::LeftEdge;
+			}
+			if (p.y <= 0)
+			{
+				e | Qt::Edge::BottomEdge;
+			}
+			if (p.x >= windowHandle()->screen()->screenGeometry().width())
+			{
+				e | Qt::Edge::RightEdge;
+			}
+			if (p.y >= windowHandle()->screen()->screenGeometry().height())
+			{
+				e | Qt::Edge::BottomEdge;
+			}
+			windowHandle()->startSystemResize(e);
+		}
+		else
+		{
+			Super::resizeEvent(event);
+		}
+#else
 		Super::resizeEvent(event);
+#endif
 	}
 
 
