@@ -549,6 +549,7 @@ namespace ads
 
 		DropContainer = TopContainer;
 
+		// Do not show drop overlay if the independent window is being dragged and dropped window is minimized
 		if (DropContainer &&
 			(DropContainer->window()->isMinimized()
 				|| (DockManager->window()->isMinimized()
@@ -581,7 +582,6 @@ namespace ads
 			DockAreaOverlay->setAllowedAreas(
 				(VisibleDockAreas == 1) ? NoDockWidgetArea : DockArea->allowedAreas());
 			DockWidgetArea Area = DockAreaOverlay->showOverlay(DockArea);
-
 			// A CenterDockWidgetArea for the dockAreaOverlay() indicates that
 			// the mouse is in the title bar. If the ContainerArea is valid
 			// then we ignore the dock area of the dockAreaOverlay() and disable
@@ -737,7 +737,7 @@ namespace ads
 			{
 				setWindowFlag(Qt::SubWindow, true);
 				setParent(nullptr);
-				setFocusPolicy(Qt::FocusPolicy::ClickFocus);
+				setFocusPolicy(Qt::FocusPolicy::StrongFocus);
 			}
 			TopLevelDockWidget->emitTopLevelChanged(true);
 		}
@@ -757,7 +757,7 @@ namespace ads
 			{
 				setWindowFlag(Qt::SubWindow, true);
 				setParent(nullptr);
-				setFocusPolicy(Qt::FocusPolicy::ClickFocus);
+				setFocusPolicy(Qt::FocusPolicy::StrongFocus);
 			}
 			TopLevelDockWidget->emitTopLevelChanged(true);
 		}
@@ -815,6 +815,8 @@ namespace ads
 			if (d->isState(DraggingFloatingWidget))
 			{
 				d->updateDropOverlays(QCursor::pos());
+				QApplication::setActiveWindow(this);
+				activateWindow();
 			}
 		}
 		break;
@@ -838,6 +840,8 @@ namespace ads
 				ADS_PRINT("CFloatingDockContainer::nativeEvent WM_ENTERSIZEMOVE");
 				d->setState(DraggingFloatingWidget);
 				d->updateDropOverlays(QCursor::pos());
+				QApplication::setActiveWindow(this);
+				activateWindow();
 			}
 			break;
 
@@ -994,17 +998,15 @@ namespace ads
 
 		case DraggingFloatingWidget:
 			d->updateDropOverlays(QCursor::pos());
-#ifdef Q_OS_MACOS
-			// In OSX when hiding the DockAreaOverlay the application would set
-			// the main window as the active window for some reason. This fixes
-			// that by resetting the active window to the floating widget after
-			// updating the overlays.
-			QApplication::setActiveWindow(this);
-#endif
 			break;
 		default:
 			break;
 		}
+		bool p = this != QApplication::activeWindow();
+		QApplication::setActiveWindow(this);
+		activateWindow();
+		bool p_ = this != QApplication::activeWindow();
+		printf("");
 	}
 
 	//============================================================================
@@ -1045,17 +1047,6 @@ namespace ads
 			{
 				d->setWindowTitle(qApp->applicationDisplayName());
 				setWindowIcon(QApplication::windowIcon());
-			}
-		}
-		for (int i = 0; i < d->DockContainer->dockAreaCount(); i++)
-		{
-			auto DW = d->DockContainer->dockArea(i);
-			if (DW && DW->features().testFlag(CDockWidget::DockWidgetIndependent))
-			{
-				//  			setParent(nullptr);
-				// 			setWindowFlag(Qt::SubWindow);
-				// 			setFocusPolicy(Qt::FocusPolicy::ClickFocus);
-				break;
 			}
 		}
 	}
@@ -1245,16 +1236,12 @@ namespace ads
 
 		case DraggingFloatingWidget:
 			d->updateDropOverlays(QCursor::pos());
-			// In OSX when hiding the DockAreaOverlay the application would set
-			// the main window as the active window for some reason. This fixes
-			// that by resetting the active window to the floating widget after
-			// updating the overlays.
-			QApplication::setActiveWindow(this->windowHandle());
 			break;
 		default:
 			break;
 		}
-
+		QApplication::setActiveWindow(this);
+		activateWindow();
 
 	}
 #endif
@@ -1378,6 +1365,8 @@ namespace ads
 		{
 			d->DraggingState = DraggingFloatingWidget;
 			d->updateDropOverlays(QCursor::pos());
+			QApplication::setActiveWindow(this);
+			activateWindow();
 		}
 		d->IsResizing = false;
 	}
