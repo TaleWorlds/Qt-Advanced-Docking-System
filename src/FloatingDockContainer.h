@@ -101,23 +101,6 @@ namespace ads
 	{
 		Q_OBJECT
 	private:
-		enum class Direction {
-			UP = 0,
-			DOWN = 1,
-			LEFT,
-			RIGHT,
-			LEFTTOP,
-			LEFTBOTTOM,
-			RIGHTBOTTOM,
-			RIGHTTOP,
-			NONE
-		};
-		bool m_bLeftPressed;
-		Direction m_Direction;
-		int m_iResizeRegionPadding;
-		QPoint m_DragPos;
-		QMargins m_transparentMargsins;
-
 		FloatingDockContainerPrivate* d; ///< private data (pimpl)
 		friend struct FloatingDockContainerPrivate;
 		friend class CDockManager;
@@ -130,6 +113,7 @@ namespace ads
 		friend class CDockWidget;
 		friend class CDockAreaWidget;
 		friend class CFloatingWidgetTitleBar;
+
 
 	private Q_SLOTS:
 		void onDockAreasAddedOrRemoved();

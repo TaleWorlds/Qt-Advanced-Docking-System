@@ -367,6 +367,26 @@ namespace ads
 	 */
 	struct FloatingDockContainerPrivate
 	{
+		/// <summary>
+		/// Cursor direction relative to the floating window
+		/// </summary>
+		enum class eDirection {
+			UP = 0,
+			DOWN = 1,
+			LEFT,
+			RIGHT,
+			LEFTTOP,
+			LEFTBOTTOM,
+			RIGHTBOTTOM,
+			RIGHTTOP,
+			NONE
+		};
+		bool LeftMBPressed;
+		eDirection CursorDirection;
+		int ResizeRegionPadding;
+		QPoint DragStartPosition;
+		QMargins TransparentMargins;
+
 		CFloatingDockContainer* _this;
 		CDockContainerWidget* DockContainer;
 		unsigned int zOrderIndex = ++zOrderCounter;
@@ -548,18 +568,6 @@ namespace ads
 		}
 
 		DropContainer = TopContainer;
-
-		// Do not show drop overlay if the independent window is being dragged and dropped window is minimized
-		if (DropContainer &&
-			(DropContainer->window()->isMinimized()
-				|| (DockManager->window()->isMinimized()
-					&& !DropContainer->topLevelDockWidget()->features().testFlag(CDockWidget::DockWidgetIndependent)
-					))
-			)
-		{
-			return;
-		}
-
 		auto ContainerOverlay = DockManager->containerOverlay();
 		auto DockAreaOverlay = DockManager->dockAreaOverlay();
 
@@ -569,6 +577,20 @@ namespace ads
 			DockAreaOverlay->hideOverlay();
 			return;
 		}
+
+		// Do not show drop overlay if the independent window is being dragged and dropped window is minimized
+		if (DropContainer &&
+			(DropContainer->window()->isMinimized()
+				|| (DockManager->window()->isMinimized()
+					&& !DropContainer->topLevelDockWidget()->features().testFlag(CDockWidget::DockWidgetIndependent)
+					))
+			)
+		{
+			ContainerOverlay->hideOverlay();
+			DockAreaOverlay->hideOverlay();
+			return;
+		}
+
 
 		int VisibleDockAreas = TopContainer->visibleDockAreaCount();
 		ContainerOverlay->setAllowedAreas(
@@ -621,15 +643,15 @@ namespace ads
 	{
 		setMouseTracking(true);
 		this->installEventFilter(this);
-		m_bLeftPressed = false;
-		m_Direction = Direction::NONE;
+		d->LeftMBPressed = false;
+		d->CursorDirection = FloatingDockContainerPrivate::eDirection::NONE;
 		if (CDockManager::testConfigFlag(CDockManager::eConfigFlag::FloatingShadowEnabled))
 		{
-			m_iResizeRegionPadding = 10;
+			d->ResizeRegionPadding = 10;
 		}
 		else
 		{
-			m_iResizeRegionPadding = 0;
+			d->ResizeRegionPadding = 0;
 		}
 		hide();
 		d->DockManager = DockManager;
@@ -693,12 +715,13 @@ namespace ads
 		}
 		else
 		{
+			d->TransparentMargins = QMargins(5, 5, 5, 5);
 			if (CDockManager::testConfigFlag(CDockManager::eConfigFlag::FloatingShadowEnabled))
 			{
 				auto shadow_ = new QGraphicsDropShadowEffect(this);
 				setAttribute(Qt::WA_TranslucentBackground);
 				shadow_->setObjectName("floatingDockContainerShadow");
-				shadow_->setBlurRadius(m_iResizeRegionPadding);
+				shadow_->setBlurRadius(d->ResizeRegionPadding);
 				shadow_->setOffset(0);
 				shadow_->setColor({ 0, 0, 0, 255 }); // black shadow
 				shadow_->setEnabled(true);
@@ -733,12 +756,6 @@ namespace ads
 		auto TopLevelDockWidget = topLevelDockWidget();
 		if (TopLevelDockWidget)
 		{
-			if (TopLevelDockWidget->features().testFlag(CDockWidget::DockWidgetIndependent))
-			{
-				setWindowFlag(Qt::SubWindow, true);
-				setParent(nullptr);
-				setFocusPolicy(Qt::FocusPolicy::StrongFocus);
-			}
 			TopLevelDockWidget->emitTopLevelChanged(true);
 		}
 
@@ -753,12 +770,6 @@ namespace ads
 		auto TopLevelDockWidget = topLevelDockWidget();
 		if (TopLevelDockWidget)
 		{
-			if (TopLevelDockWidget->features().testFlag(CDockWidget::DockWidgetIndependent))
-			{
-				setWindowFlag(Qt::SubWindow, true);
-				setParent(nullptr);
-				setFocusPolicy(Qt::FocusPolicy::StrongFocus);
-			}
 			TopLevelDockWidget->emitTopLevelChanged(true);
 		}
 		d->DockManager->notifyWidgetOrAreaRelocation(DockWidget);
@@ -1047,6 +1058,41 @@ namespace ads
 			{
 				d->setWindowTitle(qApp->applicationDisplayName());
 				setWindowIcon(QApplication::windowIcon());
+			}
+		}
+
+		std::unordered_map<CDockWidget*, bool> open_map;
+		bool has_independent_widget = false;
+		for (int j = 0; j < d->DockContainer->dockAreaCount(); j++)
+		{
+			auto DA = d->DockContainer->dockArea(j);
+			for (int i = 0; i < DA->dockWidgetsCount(); i++)
+			{
+				auto DW = DA->dockWidget(i);
+				open_map[DW] = DW->toggleViewAction()->isChecked();
+				if (DW && DW->features().testFlag(CDockWidget::DockWidgetIndependent))
+				{
+					has_independent_widget = true;
+				}
+			}
+		}
+
+		if (has_independent_widget)
+		{
+			setParent(nullptr);
+			updateGeometry();
+			// changing parents on the fly hides all children, therefore restore the visibilities
+			for (int j = 0; j < d->DockContainer->dockAreaCount(); j++)
+			{
+				auto DA = d->DockContainer->dockArea(j);
+				for (int i = 0; i < DA->dockWidgetsCount(); i++)
+				{
+					auto DW = DA->dockWidget(i);
+					if (DW && open_map[DW])
+					{
+						DW->toggleView(true);
+					}
+				}
 			}
 		}
 	}
@@ -1393,54 +1439,54 @@ namespace ads
 	void CFloatingDockContainer::region(const QPoint& cursorGlobalPoint)
 	{
 		QRect rect = this->contentsRect();
-		rect.setLeft(rect.left() + m_transparentMargsins.left());
-		rect.setTop(rect.top() + m_transparentMargsins.top());
-		rect.setRight(rect.right() - m_transparentMargsins.right());
-		rect.setBottom(rect.bottom() - m_transparentMargsins.bottom());
+		rect.setLeft(rect.left() + d->TransparentMargins.left());
+		rect.setTop(rect.top() + d->TransparentMargins.top());
+		rect.setRight(rect.right() - d->TransparentMargins.right());
+		rect.setBottom(rect.bottom() - d->TransparentMargins.bottom());
 
 		QPoint tl = mapToGlobal(rect.topLeft());
 		QPoint rb = mapToGlobal(rect.bottomRight());
 		int x = cursorGlobalPoint.x();
 		int y = cursorGlobalPoint.y();
 
-		if (tl.x() - m_iResizeRegionPadding >= x && tl.x() <= x &&
-			tl.y() - m_iResizeRegionPadding >= y && tl.y() <= y) {
-			m_Direction = Direction::LEFTTOP;
+		if (tl.x() - d->ResizeRegionPadding >= x && tl.x() <= x &&
+			tl.y() - d->ResizeRegionPadding >= y && tl.y() <= y) {
+			d->CursorDirection = FloatingDockContainerPrivate::eDirection::LEFTTOP;
 			this->setCursor(QCursor(Qt::SizeFDiagCursor));
 		}
-		else if (x >= rb.x() + m_iResizeRegionPadding && x <= rb.x() &&
-			y >= rb.y() + m_iResizeRegionPadding && y <= rb.y()) {
-			m_Direction = Direction::RIGHTBOTTOM;
+		else if (x >= rb.x() + d->ResizeRegionPadding && x <= rb.x() &&
+			y >= rb.y() + d->ResizeRegionPadding && y <= rb.y()) {
+			d->CursorDirection = FloatingDockContainerPrivate::eDirection::RIGHTBOTTOM;
 			this->setCursor(QCursor(Qt::SizeFDiagCursor));
 		}
-		else if (x <= tl.x() - m_iResizeRegionPadding && x >= tl.x() &&
-			y >= rb.y() + m_iResizeRegionPadding && y <= rb.y()) {
-			m_Direction = Direction::LEFTBOTTOM;
+		else if (x <= tl.x() - d->ResizeRegionPadding && x >= tl.x() &&
+			y >= rb.y() + d->ResizeRegionPadding && y <= rb.y()) {
+			d->CursorDirection = FloatingDockContainerPrivate::eDirection::LEFTBOTTOM;
 			this->setCursor(QCursor(Qt::SizeBDiagCursor));
 		}
-		else if (x <= rb.x() && x >= rb.x() + m_iResizeRegionPadding && y >= tl.y() &&
-			y <= tl.y() - m_iResizeRegionPadding) {
-			m_Direction = Direction::RIGHTTOP;
+		else if (x <= rb.x() && x >= rb.x() + d->ResizeRegionPadding && y >= tl.y() &&
+			y <= tl.y() - d->ResizeRegionPadding) {
+			d->CursorDirection = FloatingDockContainerPrivate::eDirection::RIGHTTOP;
 			this->setCursor(QCursor(Qt::SizeBDiagCursor));
 		}
-		else if (x <= tl.x() - m_iResizeRegionPadding && x >= tl.x()) {
-			m_Direction = Direction::LEFT;
+		else if (x <= tl.x() - d->ResizeRegionPadding && x >= tl.x()) {
+			d->CursorDirection = FloatingDockContainerPrivate::eDirection::LEFT;
 			this->setCursor(QCursor(Qt::SizeHorCursor));
 		}
-		else if (x <= rb.x() && x >= rb.x() + m_iResizeRegionPadding) {
-			m_Direction = Direction::RIGHT;
+		else if (x <= rb.x() && x >= rb.x() + d->ResizeRegionPadding) {
+			d->CursorDirection = FloatingDockContainerPrivate::eDirection::RIGHT;
 			this->setCursor(QCursor(Qt::SizeHorCursor));
 		}
-		else if (y >= tl.y() && y <= tl.y() - m_iResizeRegionPadding) {
-			m_Direction = Direction::UP;
+		else if (y >= tl.y() && y <= tl.y() - d->ResizeRegionPadding) {
+			d->CursorDirection = FloatingDockContainerPrivate::eDirection::UP;
 			this->setCursor(QCursor(Qt::SizeVerCursor));
 		}
-		else if (y <= rb.y() && y >= rb.y() + m_iResizeRegionPadding) {
-			m_Direction = Direction::DOWN;
+		else if (y <= rb.y() && y >= rb.y() + d->ResizeRegionPadding) {
+			d->CursorDirection = FloatingDockContainerPrivate::eDirection::DOWN;
 			this->setCursor(QCursor(Qt::SizeVerCursor));
 		}
 		else {
-			m_Direction = Direction::NONE;
+			d->CursorDirection = FloatingDockContainerPrivate::eDirection::NONE;
 			this->setCursor(QCursor(Qt::ArrowCursor));
 		}
 	}
@@ -1451,8 +1497,8 @@ namespace ads
 		if (d->DockManager->testConfigFlag(CDockManager::FloatingShadowEnabled))
 		{
 			if (event->button() == Qt::LeftButton) {
-				if (m_Direction != Direction::NONE) {
-					m_bLeftPressed = true;
+				if (d->CursorDirection != FloatingDockContainerPrivate::eDirection::NONE) {
+					d->LeftMBPressed = true;
 					//this->grabMouse();
 				}
 				else {
@@ -1460,12 +1506,12 @@ namespace ads
 					if (action) {
 						bool inTitlebar = false;
 						if (action == d->TitleBar) {
-							m_bLeftPressed = true;
-							m_DragPos = mapToParent(mapFromGlobal(event->globalPos())) - frameGeometry().topLeft()
-								- QPoint(m_iResizeRegionPadding, m_iResizeRegionPadding);
+							d->LeftMBPressed = true;
+							d->DragStartPosition = mapToParent(mapFromGlobal(event->globalPos())) - frameGeometry().topLeft()
+								- QPoint(d->ResizeRegionPadding, d->ResizeRegionPadding);
 #if (QT_VERSION >= QT_VERSION_CHECK(5, 15, 0))
-							m_bUseSystemMove = windowHandle()->startSystemMove();
-							Q_ASSERT_X(m_bUseSystemMove, "mousePressEvent()",
+							bool result = windowHandle()->startSystemMove();
+							Q_ASSERT_X(result, "mousePressEvent()",
 								"this->windowHandle()->startSystemMove() failed");
 #endif
 						}
@@ -1481,10 +1527,10 @@ namespace ads
 	{
 		if (d->DockManager->testConfigFlag(CDockManager::FloatingShadowEnabled))
 		{
-			m_bLeftPressed = false;
-			if (m_Direction != Direction::NONE)
+			d->LeftMBPressed = false;
+			if (d->CursorDirection != FloatingDockContainerPrivate::eDirection::NONE)
 			{
-				m_Direction = Direction::NONE;
+				d->CursorDirection = FloatingDockContainerPrivate::eDirection::NONE;
 				//this->releaseMouse();
 				this->setCursor(QCursor(Qt::ArrowCursor));
 			}
@@ -1498,7 +1544,7 @@ namespace ads
 		if (d->DockManager->testConfigFlag(CDockManager::FloatingShadowEnabled))
 		{
 			QPoint globalPoint = event->globalPos();
-			if (m_bLeftPressed) {
+			if (d->LeftMBPressed) {
 				bool bIgnore = true;
 				QList<QScreen*> screens = QGuiApplication::screens();
 				for (int i = 0; i < screens.size(); i++) {
@@ -1515,33 +1561,33 @@ namespace ads
 					return;
 				}
 
-				if (m_Direction != Direction::NONE) {
+				if (d->CursorDirection != FloatingDockContainerPrivate::eDirection::NONE) {
 					QRect rect = this->rect();
 					QPoint tl = mapToGlobal(rect.topLeft());
 					QPoint rb = mapToGlobal(rect.bottomRight());
 
 					QRect rMove(tl, rb);
 
-					switch (m_Direction) {
-					case Direction::LEFT:
+					switch (d->CursorDirection) {
+					case FloatingDockContainerPrivate::eDirection::LEFT:
 						if (rb.x() - globalPoint.x() <= this->minimumWidth())
 							rMove.setX(tl.x());
 						else
 							rMove.setX(globalPoint.x());
 						break;
-					case Direction::RIGHT:
+					case FloatingDockContainerPrivate::eDirection::RIGHT:
 						rMove.setWidth(globalPoint.x() - tl.x());
 						break;
-					case Direction::UP:
+					case FloatingDockContainerPrivate::eDirection::UP:
 						if (rb.y() - globalPoint.y() <= this->minimumHeight())
 							rMove.setY(tl.y());
 						else
 							rMove.setY(globalPoint.y());
 						break;
-					case Direction::DOWN:
+					case FloatingDockContainerPrivate::eDirection::DOWN:
 						rMove.setHeight(globalPoint.y() - tl.y());
 						break;
-					case Direction::LEFTTOP:
+					case FloatingDockContainerPrivate::eDirection::LEFTTOP:
 						if (rb.x() - globalPoint.x() <= this->minimumWidth())
 							rMove.setX(tl.x());
 						else
@@ -1551,26 +1597,26 @@ namespace ads
 						else
 							rMove.setY(globalPoint.y());
 						break;
-					case Direction::RIGHTTOP:
+					case FloatingDockContainerPrivate::eDirection::RIGHTTOP:
 						rMove.setWidth(globalPoint.x() - tl.x());
 						rMove.setY(globalPoint.y());
 						break;
-					case Direction::LEFTBOTTOM:
+					case FloatingDockContainerPrivate::eDirection::LEFTBOTTOM:
 						rMove.setX(globalPoint.x());
 						rMove.setHeight(globalPoint.y() - tl.y());
 						break;
-					case Direction::RIGHTBOTTOM:
+					case FloatingDockContainerPrivate::eDirection::RIGHTBOTTOM:
 						rMove.setWidth(globalPoint.x() - tl.x());
 						rMove.setHeight(globalPoint.y() - tl.y());
 						break;
 					default:
 						break;
 					}
-					rMove.moveTopLeft(rMove.topLeft() + QPoint(m_iResizeRegionPadding, m_iResizeRegionPadding));
+					rMove.moveTopLeft(rMove.topLeft() + QPoint(d->ResizeRegionPadding, d->ResizeRegionPadding));
 					this->setGeometry(rMove);
 				}
 				else {
-					this->move(mapToParent(mapFromGlobal(event->globalPos())) - m_DragPos);
+					this->move(mapToParent(mapFromGlobal(event->globalPos())) - d->DragStartPosition);
 					event->accept();
 				}
 			}

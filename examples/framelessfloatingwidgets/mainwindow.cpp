@@ -40,8 +40,8 @@ CMainWindow::CMainWindow(QWidget* parent)
 	CDockManager::setConfigFlag(CDockManager::FloatingContainerForceQWidgetCustomStyledTitleBar, true);
 	CDockManager::setConfigFlag(CDockManager::FloatingContainerForceNativeTitleBar, false);
 	DockManager = new CDockManager(this);
-	DockManager->setStyleSheet("");
-	qApp->setStyleSheet("");
+	//DockManager->setStyleSheet("");
+	//qApp->setStyleSheet("");
 	/*setStyleSheet(R"qss(
 ads--CDockWidgetTab {
 	border:  0px;
@@ -238,7 +238,7 @@ QStatusBar#floatingWidgetStatusBar
 	propertiesTable->setColumnCount(3);
 	propertiesTable->setRowCount(10);
 	CDockWidget* PropertiesDockWidget = new CDockWidget("Properties");
-	PropertiesDockWidget->setFeature(CDockWidget::DockWidgetIndependent, true);
+	//PropertiesDockWidget->setFeature(CDockWidget::DockWidgetIndependent, true);
 	PropertiesDockWidget->setWidget(propertiesTable);
 	PropertiesDockWidget->setMinimumSizeHintMode(CDockWidget::MinimumSizeHintFromDockWidget);
 	PropertiesDockWidget->resize(250, 150);

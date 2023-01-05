@@ -611,6 +611,12 @@ namespace ads
 	}
 
 	//============================================================================
+	bool CDockAreaTitleBar::isFocused() const
+	{
+		return d->DockArea->property("focused").toBool();
+	}
+
+	//============================================================================
 	CTitleBarButton::CTitleBarButton(bool visible, QWidget* parent)
 		: tTitleBarButton(parent),
 		Visible(visible),
