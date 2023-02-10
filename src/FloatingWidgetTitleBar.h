@@ -35,84 +35,84 @@
 
 namespace ads
 {
-class CFloatingDockContainer;
+	class CFloatingDockContainer;
 
-struct FloatingWidgetTitleBarPrivate;
-
-/**
- * Titlebar for floating widgets to capture non client are mouse events.
- * Linux does not support NonClieantArea mouse events like
- * QEvent::NonClientAreaMouseButtonPress. Because these events are required
- * for the docking system to work properly, we use our own titlebar here to
- * capture the required mouse events.
- */
-class CFloatingWidgetTitleBar : public QFrame
-{
-	Q_OBJECT
-    Q_PROPERTY(QIcon maximizeIcon READ maximizeIcon WRITE setMaximizeIcon)
-    Q_PROPERTY(QIcon normalIcon READ normalIcon WRITE setNormalIcon)
-	Q_PROPERTY(bool maximized READ maximized) // enable qss
-private:
-	FloatingWidgetTitleBarPrivate *d; ///< private data (pimpl)
-protected:
-	virtual void mousePressEvent(QMouseEvent *ev) override;
-	virtual void mouseReleaseEvent(QMouseEvent *ev) override;
-	virtual void mouseMoveEvent(QMouseEvent *ev) override;
-    virtual void mouseDoubleClickEvent(QMouseEvent *event) override;
-
-
-    void setMaximizeIcon(const QIcon& Icon);
-    QIcon maximizeIcon() const;;
-    void setNormalIcon(const QIcon& Icon);
-	QIcon normalIcon() const;
-	bool maximized() const;
-public:
-	using Super = QWidget;
-	CFloatingWidgetTitleBar(int i);
-	explicit CFloatingWidgetTitleBar(CFloatingDockContainer *parent = nullptr);
+	struct FloatingWidgetTitleBarPrivate;
 
 	/**
-	 * Virtual Destructor
+	 * Titlebar for floating widgets to capture non client are mouse events.
+	 * Linux does not support NonClieantArea mouse events like
+	 * QEvent::NonClientAreaMouseButtonPress. Because these events are required
+	 * for the docking system to work properly, we use our own titlebar here to
+	 * capture the required mouse events.
 	 */
-	virtual ~CFloatingWidgetTitleBar();
+	class CFloatingWidgetTitleBar : public QFrame
+	{
+		Q_OBJECT
+			Q_PROPERTY(QIcon maximizeIcon READ maximizeIcon WRITE setMaximizeIcon)
+			Q_PROPERTY(QIcon normalIcon READ normalIcon WRITE setNormalIcon)
+			Q_PROPERTY(bool maximized READ maximized) // enable qss
+	private:
+		FloatingWidgetTitleBarPrivate* d; ///< private data (pimpl)
+	protected:
+		virtual void mousePressEvent(QMouseEvent* ev) override;
+		virtual void mouseReleaseEvent(QMouseEvent* ev) override;
+		virtual void mouseMoveEvent(QMouseEvent* ev) override;
+		virtual void mouseDoubleClickEvent(QMouseEvent* event) override;
 
-	/**
-	 * Enables / disables the window close button.
-	 */
-	void enableCloseButton(bool Enable);
 
-	/**
-	 * Sets the window title, that means, the text of the internal tile label.
-	 */
-	void setTitle(const QString &Text);
+		void setMaximizeIcon(const QIcon& Icon);
+		QIcon maximizeIcon() const;;
+		void setNormalIcon(const QIcon& Icon);
+		QIcon normalIcon() const;
+		bool maximized() const;
+	public:
+		using Super = QWidget;
+		CFloatingWidgetTitleBar(int i);
+		explicit CFloatingWidgetTitleBar(CFloatingDockContainer* parent = nullptr);
 
-    /**
-     * Update stylesheet style if a property changes
-     */
-    void updateStyle();
+		/**
+		 * Virtual Destructor
+		 */
+		virtual ~CFloatingWidgetTitleBar();
 
-	/**
-	 * Change the maximize button icon according to current windows state
-	 */
-    void setMaximizedIcon(bool maximized);
+		/**
+		 * Enables / disables the window close button.
+		 */
+		void enableCloseButton(bool Enable);
 
-	/**
-	 * Sets the floating widget of this title bar, if it was not yet assigned.
-	 * Added for supporting user provided CFloatingDockContainers, as they can't
-	 * access the floating widget if the widget is not actually floating in the screen
-	 */
-	void setFloatingWidget(CFloatingDockContainer* parent);
+		/**
+		 * Sets the window title, that means, the text of the internal tile label.
+		 */
+		void setTitle(const QString& Text);
 
-signals:
-	/**
-	 * This signal is emitted, if the close button is clicked.
-	 */
-	void closeRequested();
+		/**
+		 * Update stylesheet style if a property changes
+		 */
+		void updateStyle();
 
-    /**
-    * This signal is emitted, if the maximize button is clicked.
-    */
-    void maximizeRequested();
-};
+		/**
+		 * Change the maximize button icon according to current windows state
+		 */
+		void setMaximizedIcon(bool maximized);
+
+		/**
+		 * Sets the floating widget of this title bar, if it was not yet assigned.
+		 * Added for supporting user provided CFloatingDockContainers, as they can't
+		 * access the floating widget if the widget is not actually floating in the screen
+		 */
+		void setFloatingWidget(CFloatingDockContainer* parent);
+
+	signals:
+		/**
+		 * This signal is emitted, if the close button is clicked.
+		 */
+		void closeRequested();
+
+		/**
+		* This signal is emitted, if the maximize button is clicked.
+		*/
+		void maximizeRequested();
+	};
 } // namespace ads
 #endif // FLOATINGWIDGETTITLEBAR_H

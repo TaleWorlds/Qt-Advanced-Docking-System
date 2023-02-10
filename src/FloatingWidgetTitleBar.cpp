@@ -242,9 +242,9 @@ namespace ads
 		{
 			d->DragState = DraggingFloatingWidget;
 #if (QT_VERSION >= QT_VERSION_CHECK(5, 15, 0))
-			bool result = windowHandle()->startSystemMove();
-			Q_ASSERT_X(result, "mousePressEvent()",
-				"this->windowHandle()->startSystemMove() failed");
+			//bool result = windowHandle()->startSystemMove();
+			//Q_ASSERT_X(result, "mousePressEvent()",
+			//	"this->windowHandle()->startSystemMove() failed");
 #endif
 			d->FloatingWidget->startDragging(ev->pos(), d->FloatingWidget->size(),
 				this);
@@ -277,28 +277,28 @@ namespace ads
 		}
 
 		// Do not move the floating container outside the available screen geometry
-		if ((ev->buttons() & Qt::LeftButton) && !d->_this->screen()->availableGeometry().contains(internal::globalPositionOf(ev)))
-		{
-			QPoint new_cursor_pos(internal::globalPositionOf(ev));
-			if (internal::globalPositionOf(ev).x() < d->_this->screen()->availableGeometry().left())
-			{
-				new_cursor_pos.setX(d->_this->screen()->availableGeometry().left());
-			}
-			if (internal::globalPositionOf(ev).x() > d->_this->screen()->availableGeometry().right())
-			{
-				new_cursor_pos.setX(d->_this->screen()->availableGeometry().right());
-			}
-			if (internal::globalPositionOf(ev).y() < d->_this->screen()->availableGeometry().top())
-			{
-				new_cursor_pos.setY(d->_this->screen()->availableGeometry().top());
-			}
-			if (internal::globalPositionOf(ev).y() > d->_this->screen()->availableGeometry().bottom())
-			{
-				new_cursor_pos.setY(d->_this->screen()->availableGeometry().bottom());
-			}
-			QCursor::setPos(new_cursor_pos);
-			return;
-		}
+		//if ((ev->buttons() & Qt::LeftButton) && !d->_this->screen()->availableGeometry().contains(internal::globalPositionOf(ev)))
+		//{
+		//	QPoint new_cursor_pos(internal::globalPositionOf(ev));
+		//	if (internal::globalPositionOf(ev).x() < d->_this->screen()->availableGeometry().left())
+		//	{
+		//		new_cursor_pos.setX(d->_this->screen()->availableGeometry().left());
+		//	}
+		//	if (internal::globalPositionOf(ev).x() > d->_this->screen()->availableGeometry().right())
+		//	{
+		//		new_cursor_pos.setX(d->_this->screen()->availableGeometry().right());
+		//	}
+		//	if (internal::globalPositionOf(ev).y() < d->_this->screen()->availableGeometry().top())
+		//	{
+		//		new_cursor_pos.setY(d->_this->screen()->availableGeometry().top());
+		//	}
+		//	if (internal::globalPositionOf(ev).y() > d->_this->screen()->availableGeometry().bottom())
+		//	{
+		//		new_cursor_pos.setY(d->_this->screen()->availableGeometry().bottom());
+		//	}
+		//	QCursor::setPos(new_cursor_pos);
+		//	return;
+		//}
 
 		// move floating window
 		if (DraggingFloatingWidget == d->DragState)

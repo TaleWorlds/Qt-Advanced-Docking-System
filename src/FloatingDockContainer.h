@@ -38,271 +38,283 @@
 #define tFloatingWidgetBase QDockWidget
 
 class CDockingStateReader;
+class QStatusBar;
 
 namespace ads
 {
-struct FloatingDockContainerPrivate;
-class CDockManager;
-struct DockManagerPrivate;
-class CDockAreaWidget;
-class CDockContainerWidget;
-class CDockWidget;
-class CDockManager;
-class CDockAreaTabBar;
-class CDockWidgetTab;
-struct DockWidgetTabPrivate;
-class CDockAreaTitleBar;
-struct DockAreaTitleBarPrivate;
-class CFloatingWidgetTitleBar;
-class CDockingStateReader;
-
-/**
- * Pure virtual interface for floating widgets.
- * This interface is used for opaque and non-opaque undocking. If opaque
- * undocking is used, the a real CFloatingDockContainer widget will be created
- */
-class ADS_EXPORT IFloatingWidget
-{
-public:
-    virtual ~IFloatingWidget() = default;
+	struct FloatingDockContainerPrivate;
+	class CDockManager;
+	struct DockManagerPrivate;
+	class CDockAreaWidget;
+	class CDockContainerWidget;
+	class CDockWidget;
+	class CDockManager;
+	class CDockAreaTabBar;
+	class CDockWidgetTab;
+	struct DockWidgetTabPrivate;
+	class CDockAreaTitleBar;
+	struct DockAreaTitleBarPrivate;
+	class CFloatingWidgetTitleBar;
+	class CDockingStateReader;
 
 	/**
-	 * Starts floating.
-	 * This function should get called typically from a mouse press event
-	 * handler
+	 * Pure virtual interface for floating widgets.
+	 * This interface is used for opaque and non-opaque undocking. If opaque
+	 * undocking is used, the a real CFloatingDockContainer widget will be created
 	 */
-	virtual void startFloating(const QPoint& DragStartMousePos, const QSize& Size,
-        eDragState DragState, QWidget* MouseEventHandler) = 0;
-
-	/**
-	 * Moves the widget to a new position relative to the position given when
-	 * startFloating() was called.
-	 * This function should be called from a mouse mouve event handler to
-	 * move the floating widget on mouse move events.
-	 */
-	virtual void moveFloating() = 0;
-
-	/**
-	 * Tells the widget that to finish dragging if the mouse is released.
-	 * This function should be called from a mouse release event handler
-	 * to finish the dragging
-	 */
-	virtual void finishDragging() = 0;
-};
-
-
-/**
- * This implements a floating widget that is a dock container that accepts
- * docking of dock widgets like the main window and that can be docked into
- * another dock container.
- * Every floating window of the docking system is a FloatingDockContainer.
- */
-class ADS_EXPORT CFloatingDockContainer : public tFloatingWidgetBase, public IFloatingWidget
-{
-	Q_OBJECT
-private:
-	FloatingDockContainerPrivate* d; ///< private data (pimpl)
-	friend struct FloatingDockContainerPrivate;
-	friend class CDockManager;
-	friend struct DockManagerPrivate;
-	friend class CDockAreaTabBar;
-	friend struct DockWidgetTabPrivate;
-	friend class CDockWidgetTab;
-	friend class CDockAreaTitleBar;
-	friend struct DockAreaTitleBarPrivate;
-	friend class CDockWidget;
-	friend class CDockAreaWidget;
-    friend class CFloatingWidgetTitleBar;
-
-
-private Q_SLOTS:
-	void onDockAreasAddedOrRemoved();
-	void onDockAreaCurrentChanged(int Index);
-
-protected:
-	/**
-	 * Starts floating at the given global position.
-	 * Use moveToGlobalPos() to move the widget to a new position
-	 * depending on the start position given in Pos parameter
-	 */
-	virtual void startFloating(const QPoint& DragStartMousePos, const QSize& Size,
-        eDragState DragState, QWidget* MouseEventHandler) override;
-
-	/**
-	 * Call this function to start dragging the floating widget
-	 */
-    void startDragging(const QPoint& DragStartMousePos, const QSize& Size,
-        QWidget* MouseEventHandler)
+	class ADS_EXPORT IFloatingWidget
 	{
-        startFloating(DragStartMousePos, Size, DraggingFloatingWidget, MouseEventHandler);
-	}
+	public:
+		virtual ~IFloatingWidget() = default;
+
+		/**
+		 * Starts floating.
+		 * This function should get called typically from a mouse press event
+		 * handler
+		 */
+		virtual void startFloating(const QPoint& DragStartMousePos, const QSize& Size,
+			eDragState DragState, QWidget* MouseEventHandler) = 0;
+
+		/**
+		 * Moves the widget to a new position relative to the position given when
+		 * startFloating() was called.
+		 * This function should be called from a mouse mouve event handler to
+		 * move the floating widget on mouse move events.
+		 */
+		virtual void moveFloating() = 0;
+
+		/**
+		 * Tells the widget that to finish dragging if the mouse is released.
+		 * This function should be called from a mouse release event handler
+		 * to finish the dragging
+		 */
+		virtual void finishDragging() = 0;
+	};
+
 
 	/**
-	 * Call this function if you explicitly want to signal that dragging has
-	 * finished
+	 * This implements a floating widget that is a dock container that accepts
+	 * docking of dock widgets like the main window and that can be docked into
+	 * another dock container.
+	 * Every floating window of the docking system is a FloatingDockContainer.
 	 */
-	virtual void finishDragging() override;
-
-	/**
-	 * Call this function if you just want to initialize the position
-	 * and size of the floating widget
-	 */
-	void initFloatingGeometry(const QPoint& DragStartMousePos, const QSize& Size)
+	class ADS_EXPORT CFloatingDockContainer : public tFloatingWidgetBase, public IFloatingWidget
 	{
-        startFloating(DragStartMousePos, Size, DraggingInactive, nullptr);
-	}
+		Q_OBJECT
+	private:
+		FloatingDockContainerPrivate* d; ///< private data (pimpl)
+		friend struct FloatingDockContainerPrivate;
+		friend class CDockManager;
+		friend struct DockManagerPrivate;
+		friend class CDockAreaTabBar;
+		friend struct DockWidgetTabPrivate;
+		friend class CDockWidgetTab;
+		friend class CDockAreaTitleBar;
+		friend struct DockAreaTitleBarPrivate;
+		friend class CDockWidget;
+		friend class CDockAreaWidget;
+		friend class CFloatingWidgetTitleBar;
 
-	/**
-	 * Moves the widget to a new position relative to the position given when
-	 * startFloating() was called
-	 */
-	void moveFloating() override;
+		/**
+		 * Must be called on constructor only
+		 */
+		void decideNative(QWidget* w = nullptr);
+	private Q_SLOTS:
+		void onDockAreasAddedOrRemoved();
+		void onDockAreaCurrentChanged(int Index);
 
-	/**
-	 * Restores the state from given stream.
-	 * If Testing is true, the function only parses the data from the given
-	 * stream but does not restore anything. You can use this check for
-	 * faulty files before you start restoring the state
-	 */
-	bool restoreState(CDockingStateReader& Stream, bool Testing);
+	protected:
+		/**
+		 * Starts floating at the given global position.
+		 * Use moveToGlobalPos() to move the widget to a new position
+		 * depending on the start position given in Pos parameter
+		 */
+		virtual void startFloating(const QPoint& DragStartMousePos, const QSize& Size,
+			eDragState DragState, QWidget* MouseEventHandler) override;
 
-	/**
-	 * Call this function to update the window title
-	 */
-    void updateWindowTitle();
+		/**
+		 * Call this function to start dragging the floating widget
+		 */
+		void startDragging(const QPoint& DragStartMousePos, const QSize& Size,
+			QWidget* MouseEventHandler)
+		{
+			startFloating(DragStartMousePos, Size, DraggingFloatingWidget, MouseEventHandler);
+		}
 
-protected: // reimplements QWidget
-	virtual void changeEvent(QEvent *event) override;
-	virtual void closeEvent(QCloseEvent *event) override;
-	virtual void hideEvent(QHideEvent *event) override;
-	virtual void showEvent(QShowEvent *event) override;
+		/**
+		 * Call this function if you explicitly want to signal that dragging has
+		 * finished
+		 */
+		virtual void finishDragging() override;
+
+		/**
+		 * Call this function if you just want to initialize the position
+		 * and size of the floating widget
+		 */
+		void initFloatingGeometry(const QPoint& DragStartMousePos, const QSize& Size)
+		{
+			startFloating(DragStartMousePos, Size, DraggingInactive, nullptr);
+		}
+
+		/**
+		 * Moves the widget to a new position relative to the position given when
+		 * startFloating() was called
+		 */
+		void moveFloating() override;
+
+		/**
+		 * Restores the state from given stream.
+		 * If Testing is true, the function only parses the data from the given
+		 * stream but does not restore anything. You can use this check for
+		 * faulty files before you start restoring the state
+		 */
+		bool restoreState(CDockingStateReader& Stream, bool Testing);
+
+		/**
+		 * Call this function to update the window title
+		 */
+		void updateWindowTitle();
+
+
+	protected: // reimplements QWidget
+		virtual void changeEvent(QEvent* event) override;
+		virtual void closeEvent(QCloseEvent* event) override;
+		virtual void hideEvent(QHideEvent* event) override;
+		virtual void showEvent(QShowEvent* event) override;
 
 #ifdef Q_OS_MACOS
-	virtual bool event(QEvent *e) override;
-	virtual void moveEvent(QMoveEvent *event) override;
+		virtual bool event(QEvent* e) override;
+		virtual void moveEvent(QMoveEvent* event) override;
 #endif
 
-	virtual void moveEvent(QMoveEvent *event) override;
-	virtual void resizeEvent(QResizeEvent *event) override;
-	virtual bool event(QEvent *e) override;
-	
-	void region(const QPoint& cursorGlobalPoint);
-	virtual void mousePressEvent(QMouseEvent* event) override;
-	virtual void mouseReleaseEvent(QMouseEvent* event) override;
-	virtual void mouseMoveEvent(QMouseEvent* eevent) override;
+		virtual void moveEvent(QMoveEvent* event) override;
+		virtual void resizeEvent(QResizeEvent* event) override;
+		virtual bool event(QEvent* e) override;
+
+		void region(const QPoint& cursorGlobalPoint);
+		virtual void mousePressEvent(QMouseEvent* event) override;
+		virtual void mouseReleaseEvent(QMouseEvent* event) override;
+		virtual void mouseMoveEvent(QMouseEvent* eevent) override;
 
 #ifdef Q_OS_WIN
-	/**
-	 * Native event filter for handling WM_MOVING messages on Windows
-	 */
+		/**
+		 * Native event filter for handling WM_MOVING messages on Windows
+		 */
 #if (QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
-    virtual bool nativeEvent(const QByteArray &eventType, void *message, long *result) override;
+		virtual bool nativeEvent(const QByteArray& eventType, void* message, long* result) override;
 #else
-    virtual bool nativeEvent(const QByteArray &eventType, void *message, qintptr *result) override;
+		virtual bool nativeEvent(const QByteArray& eventType, void* message, qintptr* result) override;
 #endif
 #endif
 
 
-public:
-	using Super = tFloatingWidgetBase;
+	public:
+		using Super = tFloatingWidgetBase;
 
-	/**
-	 * Create empty floating widget - required for restore state
-	 */
-	CFloatingDockContainer(CDockManager* DockManager);
+		/**
+		 * Create empty floating widget - required for restore state
+		 */
+		CFloatingDockContainer(CDockManager* DockManager, bool inheritance_flag = false);
 
-	/**
-	 * Create floating widget with the given dock area
-	 */
-	CFloatingDockContainer(CDockAreaWidget* DockArea);
+		/**
+		 * Create floating widget with the given dock container
+		 */
+		CFloatingDockContainer(CDockManager* DockManager, CDockContainerWidget* DockContainer);
 
-	/**
-	 * Create floating widget with the given dock widget
-	 */
-	CFloatingDockContainer(CDockWidget* DockWidget);
+		/**
+		 * Create floating widget with the given dock area
+		 */
+		CFloatingDockContainer(CDockAreaWidget* DockArea);
 
-	/**
-	 * Virtual Destructor
-	 */
-	virtual ~CFloatingDockContainer();
+		/**
+		 * Create floating widget with the given dock widget
+		 */
+		CFloatingDockContainer(CDockWidget* DockWidget);
 
-	/**
-	 * Access function for the internal dock container
-	 */
-	CDockContainerWidget* dockContainer() const;
 
-	/**
-	 * This function returns true, if it can be closed.
-	 * It can be closed, if all dock widgets in all dock areas can be closed
-	 */
-    bool isClosable() const;
 
-    /**
-     * This function returns true, if this floating widget has only one single
-     * visible dock widget in a single visible dock area.
-     * The single dock widget is a real top level floating widget because no
-     * other widgets are docked.
-     */
-    bool hasTopLevelDockWidget() const;
+		/**
+		 * Virtual Destructor
+		 */
+		virtual ~CFloatingDockContainer();
 
-    /**
-     * This function returns the first dock widget in the first dock area.
-     * If the function hasSingleDockWidget() returns true, then this function
-     * returns this single dock widget.
-     */
-    CDockWidget* topLevelDockWidget() const;
+		/**
+		 * Access function for the internal dock container
+		 */
+		CDockContainerWidget* dockContainer() const;
 
-    /**
-     * This function returns a list of all dock widget in this floating widget.
-     * This is a simple convenience function that simply calls the dockWidgets()
-     * function of the internal container widget.
-     */
-    QList<CDockWidget*> dockWidgets() const;
+		/**
+		 * This function returns true, if it can be closed.
+		 * It can be closed, if all dock widgets in all dock areas can be closed
+		 */
+		bool isClosable() const;
 
-	/**
-	 * This function hides the floating bar instantely and delete it later.
-	 */
-	void hideAndDeleteLater();
+		/**
+		 * This function returns true, if this floating widget has only one single
+		 * visible dock widget in a single visible dock area.
+		 * The single dock widget is a real top level floating widget because no
+		 * other widgets are docked.
+		 */
+		bool hasTopLevelDockWidget() const;
 
-//#ifdef Q_OS_LINUX
-    /**
-	 * This is a function that responds to FloatingWidgetTitleBar::maximizeRequest()
-	 * Maximize or normalize the container size.
-     */
-    void onMaximizeRequest();
+		/**
+		 * This function returns the first dock widget in the first dock area.
+		 * If the function hasSingleDockWidget() returns true, then this function
+		 * returns this single dock widget.
+		 */
+		CDockWidget* topLevelDockWidget() const;
 
-	/**
-	 * Normalize (Unmaximize) the window.
-	 *	fixGeometry parameter fixes a "bug" in QT where immediately after calling showNormal
-	 *	geometry is not set properly.
-	 *	Set this true when moving the window immediately after normalizing.
-	 */
-	void showNormal(bool fixGeometry=false);
+		/**
+		 * This function returns a list of all dock widget in this floating widget.
+		 * This is a simple convenience function that simply calls the dockWidgets()
+		 * function of the internal container widget.
+		 */
+		QList<CDockWidget*> dockWidgets() const;
 
-	/**
-	 * Maximizes the window.
-	 */
-	void showMaximized();
+		/**
+		 * This function hides the floating bar instantely and delete it later.
+		 */
+		void hideAndDeleteLater();
 
-	/**
-	 * Returns if the window is currently maximized or not.
-	 */
-	bool isMaximized() const;
+		//#ifdef Q_OS_LINUX
+			/**
+			 * This is a function that responds to FloatingWidgetTitleBar::maximizeRequest()
+			 * Maximize or normalize the container size.
+			 */
+		void onMaximizeRequest();
 
-	/**
-	 * Patched show to prevent the window from appearing in the taskbar.
-	 */
-	void show();
+		/**
+		 * Normalize (Unmaximize) the window.
+		 *	fixGeometry parameter fixes a "bug" in QT where immediately after calling showNormal
+		 *	geometry is not set properly.
+		 *	Set this true when moving the window immediately after normalizing.
+		 */
+		void showNormal(bool fixGeometry = false);
 
-	/**
-	 * Returns true if the floating widget has a native titlebar or false if
-	 * the floating widget has a QWidget based title bar
-	 */
-	bool hasNativeTitleBar();
-//#endif
+		/**
+		 * Maximizes the window.
+		 */
+		void showMaximized();
 
-}; // class FloatingDockContainer
+		/**
+		 * Returns if the window is currently maximized or not.
+		 */
+		bool isMaximized() const;
+
+		/**
+		 * Patched show to prevent the window from appearing in the taskbar.
+		 */
+		void show();
+
+		/**
+		 * Returns true if the floating widget has a native titlebar or false if
+		 * the floating widget has a QWidget based title bar
+		 */
+		bool hasNativeTitleBar();
+		//#endif
+
+	}; // class FloatingDockContainer
 }
- // namespace ads
+// namespace ads
 //-----------------------------------------------------------------------------
 #endif // FloatingDockContainerH

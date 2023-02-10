@@ -40,175 +40,12 @@ CMainWindow::CMainWindow(QWidget* parent)
 	CDockManager::setConfigFlag(CDockManager::FloatingContainerForceQWidgetCustomStyledTitleBar, true);
 	CDockManager::setConfigFlag(CDockManager::FloatingContainerForceNativeTitleBar, false);
 	DockManager = new CDockManager(this);
-	//DockManager->setStyleSheet("");
-	//qApp->setStyleSheet("");
-	/*setStyleSheet(R"qss(
-ads--CDockWidgetTab {
-	border:  0px;
-	padding: 0px;
-}
-
-ads--CDockAreaTabBar {
-	border: 0px;
-}
-
-ads--CDockWidgetTab:hover[focused="false"][activeTab="false"] {
-	background: palette(window);
-}
-
-ads--CDockWidgetTab[focused="false"][activeTab="true"] {
-	background: #2a2a2a;
-}
-
-ads--CDockWidgetTab[focused="true"][activeTab="true"]
-{
-	background: rgb(139, 195, 74);
-	border: 0px solid;
-}
-
-ads--CDockWidgetTab[focused="true"][activeTab="false"]
-{
-	background: palette(window);
-	border: 0px solid;
-}
-
-ads--CDockContainerWidget[floating="true"]
-{
-	border: 1px solid rgb(100, 100, 100);
-	border-top: 0px solid;
-}
-
-ads--CDockContainerWidget[floating="false"]
-{
-	border: 0px;
-}
-
-ads--CDockAreaTitleBar {
-	border: 0px;
-	border-bottom: 2px solid rgb(139, 195, 74);
-	border-radius: 0px;
-}
-
-ads--CDockWidget {
-	border: 0px;
-}
-
-ads--CFloatingWidgetTitleBar
-{
-	border: 1px solid rgb(100, 100, 100);
-	background-color: rgb(80, 80, 80);
-}
-
-#dockAreaCloseButton {
-	qproperty-icon: url(:/icon/dark_lightgreen_theme/primary/close.svg),
-		url(:/icon/dark_lightgreen_theme/disabled/close.svg) disabled;
-	qproperty-iconSize: 16px;
-}
-
-#detachGroupButton {
-	qproperty-icon: url(:/icon/dark_lightgreen_theme/primary/float.svg),
-		url(:/icon/dark_lightgreen_theme/disabled/float.svg) disabled;
-	qproperty-iconSize: 16px;
-}
-
-QToolButton#floatingTitleCloseButton {
-	qproperty-icon: url(:/icon/dark_lightgreen_theme/primary/close.svg),
-		url(:/icon/dark_lightgreen_theme/disabled/close.svg) disabled;
-	qproperty-iconSize: 16px;
-	background-color: rgb(80, 80, 80);
-}
-
-QToolButton#floatingTitleCloseButton:hover {
-	background-color: rgb(0, 0, 0);
-}
-
-QToolButton#floatingTitleCloseButton:pressed {
-	background-color: rgb(80, 80, 80);
-}
-
-QToolButton#floatingTitleMaximizeButton {
-	qproperty-icon: url(:/icon/dark_lightgreen_theme/primary/float.svg),
-		url(:/icon/dark_lightgreen_theme/disabled/float.svg) disabled;
-	qproperty-iconSize: 16px;
-	background-color: rgb(80, 80, 80);
-}
-
-
-QToolButton#floatingTitleMaximizeButton:hover {
-	background-color: rgb(0, 0, 0);
-}
-
-QToolButton#floatingTitleMaximizeButton:pressed {
-	background-color: rgb(80, 80, 80);
-}
-
-#tabCloseButton {
-	margin-top: 2px;
-	background: palette(window);
-	border: none;
-	padding: 0px -2px;
-	qproperty-icon: url(:/icon/dark_lightgreen_theme/primary/tab_close.svg),
-		url(:/icon/dark_lightgreen_theme/disabled/tab_close.svg) disabled;
-	qproperty-iconSize: 15px;
-	height: 15px;
-}
-
-#tabCloseButton:hover {
-	background: rgb(0, 0, 0);
-}
-
-#tabCloseButton:pressed {
-	background: rgb(0, 0, 0);
-}
-
-#tabsMenuButton::menu-indicator {
-	image: none;
-}
-
-#tabsMenuButton {
-	qproperty-icon: url(:/icon/dark_lightgreen_theme/primary/downarrow.svg),
-		url(:/icon/dark_lightgreen_theme/disabled/downarrow.svg) disabled;
-	qproperty-iconSize: 16px;
-	background: palette(window);
-}
-
-#tabsMenuButton:hover {
-	background-color: rgb(0, 0, 0);
-}
-
-#tabsMenuButton:pressed {
-	background: palette(window);
-}
-
-QSplitter::handle:horizontal {
-	image: url(:/icon/dark_lightgreen_theme/primary/splitter-horizontal.svg);
-	qproperty-handleWidth: 5px;
-	width: 5px;
-	border: 0px;
-	background: #2a2a2a;
-}
-
-QSplitter::handle:vertical {
-	image: url(:/icon/dark_lightgreen_theme/primary/splitter-vertical.svg);
-	qproperty-handleWidth: 5px;
-	height: 5px;
-	border: 0px;
-	background: #2a2a2a;
-}
-
-QStatusBar#floatingWidgetStatusBar
-{
-	qproperty-sizeGripEnabled: true;
-	border: 0px;
-	border-top: 0px solid rgb(100, 100, 100);
-})qss");*/
-
-// Set central widget
+	// Set central widget
 	QPlainTextEdit* w = new QPlainTextEdit();
 	w->setPlaceholderText("This is the central editor. Enter your text here.");
 	CDockWidget* CentralDockWidget = new CDockWidget("CentralWidget");
 	CentralDockWidget->setWidget(w);
-	auto* CentralDockArea = DockManager->setCentralWidget(CentralDockWidget);
+	auto* CentralDockArea = /*DockManager->setCentralWidget(CentralDockWidget)*/DockManager->addDockWidget(ads::CenterDockWidgetArea, CentralDockWidget);
 	CentralDockArea->setAllowedAreas(DockWidgetArea::OuterDockAreas);
 
 	// create other dock widgets
@@ -238,7 +75,7 @@ QStatusBar#floatingWidgetStatusBar
 	propertiesTable->setColumnCount(3);
 	propertiesTable->setRowCount(10);
 	CDockWidget* PropertiesDockWidget = new CDockWidget("Properties");
-	//PropertiesDockWidget->setFeature(CDockWidget::DockWidgetIndependent, true);
+	PropertiesDockWidget->setFeature(CDockWidget::DockWidgetIndependent, true);
 	PropertiesDockWidget->setWidget(propertiesTable);
 	PropertiesDockWidget->setMinimumSizeHintMode(CDockWidget::MinimumSizeHintFromDockWidget);
 	PropertiesDockWidget->resize(250, 150);
