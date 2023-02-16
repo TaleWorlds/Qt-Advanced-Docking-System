@@ -61,6 +61,11 @@ namespace ads
 		{
 			Canceled = true;
 			Q_EMIT _this->draggingCanceled();
+			if (ContentSourceArea && ContentSourceArea->dockContainer()->isFloating())
+			{
+				ContentSourceArea->dockContainer()->floatingWidget()->containerOverlay()->hideOverlay();
+				ContentSourceArea->dockContainer()->floatingWidget()->dockAreaOverlay()->hideOverlay();
+			}
 			DockManager->containerOverlay()->hideOverlay();
 			DockManager->dockAreaOverlay()->hideOverlay();
 			_this->close();
@@ -79,6 +84,13 @@ namespace ads
 	void FloatingDragPreviewPrivate::updateDropOverlays(const QPoint& GlobalPos)
 	{
 		if (!_this->isVisible() || !DockManager)
+		{
+			return;
+		}
+
+		// Prevent display of drop overlays and docking as long as a modal dialog
+		// is active
+		if (qApp->activeModalWidget())
 		{
 			return;
 		}
@@ -103,15 +115,25 @@ namespace ads
 		}
 
 		DropContainer = TopContainer;
-		auto ContainerOverlay = DockManager->containerOverlay();
-		auto DockAreaOverlay = DockManager->dockAreaOverlay();
-		auto DockDropArea = DockAreaOverlay->dropAreaUnderCursor();
-		auto ContainerDropArea = ContainerOverlay->dropAreaUnderCursor();
+		CDockOverlay* ContainerOverlay = 0;
+		CDockOverlay* DockAreaOverlay = 0;
+		if (ContentSourceArea->dockContainer()->isFloating())
+		{
+			ContainerOverlay = ContentSourceArea->dockContainer()->floatingWidget()->containerOverlay();
+			DockAreaOverlay = ContentSourceArea->dockContainer()->floatingWidget()->dockAreaOverlay();
+		}
+		else
+		{
+			ContainerOverlay = DockManager->containerOverlay();
+			DockAreaOverlay = DockManager->dockAreaOverlay();
+		}
 
 		if (!TopContainer)
 		{
 			ContainerOverlay->hideOverlay();
 			DockAreaOverlay->hideOverlay();
+			DockManager->containerOverlay()->hideOverlay();
+			DockManager->dockAreaOverlay()->hideOverlay();
 			if (CDockManager::testConfigFlag(CDockManager::DragPreviewIsDynamic))
 			{
 				setHidden(false);
@@ -119,60 +141,57 @@ namespace ads
 			return;
 		}
 
+		// Do not show drop overlay if the dropped widget's window is minimized
+		if (DropContainer &&
+			DropContainer->window()->isMinimized())
+		{
+			ContainerOverlay->hideOverlay();
+			DockAreaOverlay->hideOverlay();
+			DockManager->dockAreaOverlay()->hideOverlay();
+			DockManager->containerOverlay()->hideOverlay();
+			return;
+		}
+
 		int VisibleDockAreas = TopContainer->visibleDockAreaCount();
 		ContainerOverlay->setAllowedAreas(
 			VisibleDockAreas > 1 ? OuterDockAreas : AllDockAreas);
-		auto DockArea = TopContainer->dockAreaAt(GlobalPos);
-		if (DockArea && DockArea->isVisible() && VisibleDockAreas >= 0 && DockArea != ContentSourceArea)
+		DockWidgetArea ContainerArea = ContainerOverlay->showOverlay(TopContainer);
+		_this->activateWindow();
+		ContainerOverlay->enableDropPreview(ContainerArea != InvalidDockWidgetArea);
+		auto DockAreaWidget = TopContainer->dockAreaAt(GlobalPos);
+		DockWidgetArea DAWArea = InvalidDockWidgetArea;
+		if (DockAreaWidget && DockAreaWidget->isVisible() && VisibleDockAreas > 0)
 		{
 			DockAreaOverlay->enableDropPreview(true);
 			DockAreaOverlay->setAllowedAreas(
-				(VisibleDockAreas == 1) ? NoDockWidgetArea : DockArea->allowedAreas());
-			DockWidgetArea Area = DockAreaOverlay->showOverlay(DockArea);
-
+				(VisibleDockAreas == 1) ? NoDockWidgetArea : DockAreaWidget->allowedAreas());
+			DAWArea = DockAreaOverlay->showOverlay(DockAreaWidget);
+			_this->activateWindow();
 			// A CenterDockWidgetArea for the dockAreaOverlay() indicates that
 			// the mouse is in the title bar. If the ContainerArea is valid
 			// then we ignore the dock area of the dockAreaOverlay() and disable
 			// the drop preview
-			if ((Area == CenterDockWidgetArea) && (ContainerDropArea != InvalidDockWidgetArea))
+			if ((DAWArea == CenterDockWidgetArea)
+				&& (ContainerArea != InvalidDockWidgetArea))
 			{
 				DockAreaOverlay->enableDropPreview(false);
 				ContainerOverlay->enableDropPreview(true);
 			}
 			else
 			{
-				ContainerOverlay->enableDropPreview(InvalidDockWidgetArea == Area);
+				ContainerOverlay->enableDropPreview(InvalidDockWidgetArea == DAWArea);
 			}
-			ContainerOverlay->showOverlay(TopContainer);
 		}
 		else
 		{
 			DockAreaOverlay->hideOverlay();
-			// If there is only one single visible dock area in a container, then
-			// it does not make sense to show a dock overlay because the dock area
-			// would be removed and inserted at the same position
-			if (VisibleDockAreas == 1)
-			{
-				ContainerOverlay->hideOverlay();
-			}
-			else
-			{
-				ContainerOverlay->showOverlay(TopContainer);
-			}
-
-
-			if (DockArea == ContentSourceArea && InvalidDockWidgetArea == ContainerDropArea)
-			{
-				DropContainer = nullptr;
-			}
 		}
 
 		if (CDockManager::testConfigFlag(CDockManager::DragPreviewIsDynamic))
 		{
-			setHidden(DockDropArea != InvalidDockWidgetArea || ContainerDropArea != InvalidDockWidgetArea);
+			setHidden(DAWArea != InvalidDockWidgetArea || ContainerArea != InvalidDockWidgetArea);
 		}
 	}
-
 
 	//============================================================================
 	FloatingDragPreviewPrivate::FloatingDragPreviewPrivate(CFloatingDragPreview* _public) :
@@ -180,7 +199,6 @@ namespace ads
 	{
 
 	}
-
 
 	//============================================================================
 	void FloatingDragPreviewPrivate::createFloatingWidget()
@@ -202,59 +220,7 @@ namespace ads
 		if (FloatingWidget)
 		{
 			QRect geo;
-			// Non-native tiling
-			if (QCursor::pos().y() <= 0
-				&& QCursor::pos().x() < FloatingWidget->screen()->availableGeometry().width() - 1
-				&& QCursor::pos().x() > 0)
-			{
-				// maximize window instead
-				FloatingWidget->showMaximized();
-				return;
-			}
-			else if (QCursor::pos().y() > 0
-				&& QCursor::pos().y() < FloatingWidget->screen()->availableGeometry().height() - 1
-				&& QCursor::pos().x() <= 0)
-			{
-				QSize s(FloatingWidget->screen()->availableGeometry().width() / 2, FloatingWidget->screen()->availableGeometry().height());
-				FloatingWidget->move(0, 0);
-				FloatingWidget->resize(s);
-			}
-			else if (QCursor::pos().y() > 0
-				&& QCursor::pos().y() < FloatingWidget->screen()->availableGeometry().height() - 1
-				&& QCursor::pos().x() >= FloatingWidget->screen()->availableGeometry().width() - 1)
-			{
-				QSize s(FloatingWidget->screen()->availableGeometry().width() / 2, FloatingWidget->screen()->availableGeometry().height());
-				FloatingWidget->move(FloatingWidget->screen()->availableGeometry().width() / 2, 0);
-				FloatingWidget->resize(s);
-			}
-			else if (QCursor::pos().y() == 0 && QCursor::pos().x() == 0)
-			{
-				QSize s(FloatingWidget->screen()->availableGeometry().width() / 2, FloatingWidget->screen()->availableGeometry().height() / 2);
-				FloatingWidget->move(0, 0);
-				FloatingWidget->resize(s);
-			}
-			else if (QCursor::pos().y() == 0 && QCursor::pos().x() >= FloatingWidget->screen()->availableGeometry().width() - 1)
-			{
-				QSize s(FloatingWidget->screen()->availableGeometry().width() / 2, FloatingWidget->screen()->availableGeometry().height() / 2);
-				FloatingWidget->move(FloatingWidget->screen()->availableGeometry().width() / 2, 0);
-				FloatingWidget->resize(s);
-			}
-			else if (QCursor::pos().x() == 0 && QCursor::pos().y() >= FloatingWidget->screen()->availableGeometry().height() - 1)
-			{
-				QSize s(FloatingWidget->screen()->availableGeometry().width() / 2, FloatingWidget->screen()->availableGeometry().height() / 2);
-				FloatingWidget->move(0, FloatingWidget->screen()->availableGeometry().height() / 2);
-				FloatingWidget->resize(s);
-			}
-			else if (QCursor::pos().x() >= FloatingWidget->screen()->availableGeometry().width() - 1 && QCursor::pos().y() >= FloatingWidget->screen()->availableGeometry().height() - 1)
-			{
-				QSize s(FloatingWidget->screen()->availableGeometry().width() / 2, FloatingWidget->screen()->availableGeometry().height() / 2);
-				FloatingWidget->move(FloatingWidget->screen()->availableGeometry().width() / 2, FloatingWidget->screen()->availableGeometry().height() / 2);
-				FloatingWidget->resize(s);
-			}
-			else
-			{
-				FloatingWidget->setGeometry(_this->geometry());
-			}
+			FloatingWidget->setGeometry(_this->geometry());
 			geo = FloatingWidget->geometry();
 			FloatingWidget->show();
 			if (!CDockManager::testConfigFlag(CDockManager::DragPreviewHasWindowFrame))
@@ -267,7 +233,6 @@ namespace ads
 			}
 		}
 	}
-
 
 	//============================================================================
 	CFloatingDragPreview::CFloatingDragPreview(QWidget* Content, QWidget* parent) :
@@ -316,20 +281,16 @@ namespace ads
 
 	//============================================================================
 	CFloatingDragPreview::CFloatingDragPreview(CDockWidget* Content)
-		: CFloatingDragPreview((QWidget*)Content, Content->dockManager())
+		: CFloatingDragPreview((QWidget*)Content, Content)
 	{
 		d->DockManager = Content->dockManager();
-		if (Content->dockAreaWidget()->openDockWidgetsCount() == 1)
-		{
-			d->ContentSourceArea = Content->dockAreaWidget();
-		}
+		d->ContentSourceArea = Content->dockAreaWidget();
 		setWindowTitle(Content->windowTitle());
 	}
 
-
 	//============================================================================
 	CFloatingDragPreview::CFloatingDragPreview(CDockAreaWidget* Content)
-		: CFloatingDragPreview((QWidget*)Content, Content->dockManager())
+		: CFloatingDragPreview((QWidget*)Content, Content)
 	{
 		d->DockManager = Content->dockManager();
 		d->ContentSourceArea = Content;
@@ -350,31 +311,6 @@ namespace ads
 		int BorderSize = (frameSize().width() - size().width()) / 2;
 		const QPoint moveToPos = QCursor::pos() - d->DragStartMousePosition
 			- QPoint(BorderSize, 0);
-		// Do not move the preview outside the available screen geometry
-		if (!d->_this->screen()->availableGeometry().contains(QCursor::pos()))
-		{
-			QPoint new_cursor_pos(QCursor::pos());
-			if (QCursor::pos().x() < d->_this->screen()->availableGeometry().left())
-			{
-				new_cursor_pos.setX(d->_this->screen()->availableGeometry().left());
-			}
-			if (QCursor::pos().x() > d->_this->screen()->availableGeometry().right())
-			{
-				new_cursor_pos.setX(d->_this->screen()->availableGeometry().right());
-			}
-			if (QCursor::pos().y() < d->_this->screen()->availableGeometry().top())
-			{
-				new_cursor_pos.setY(d->_this->screen()->availableGeometry().top());
-			}
-			if (QCursor::pos().y() > d->_this->screen()->availableGeometry().bottom())
-			{
-				new_cursor_pos.setY(d->_this->screen()->availableGeometry().bottom());
-			}
-
-			d->updateDropOverlays(QCursor::pos());
-			QCursor::setPos(new_cursor_pos);
-			return;
-		}
 		move(moveToPos);
 		d->updateDropOverlays(QCursor::pos());
 	}
@@ -390,7 +326,6 @@ namespace ads
 		d->DragStartMousePosition = DragStartMousePos;
 		moveFloating();
 		show();
-
 	}
 
 
@@ -398,8 +333,24 @@ namespace ads
 	void CFloatingDragPreview::finishDragging()
 	{
 		ADS_PRINT("CFloatingDragPreview::finishDragging");
-		auto DockDropArea = d->DockManager->dockAreaOverlay()->visibleDropAreaUnderCursor();
-		auto ContainerDropArea = d->DockManager->containerOverlay()->visibleDropAreaUnderCursor();
+		CDockOverlay* containerOverlay = 0;
+		CDockOverlay* dockAreaOverlay = 0;
+		if (d->ContentSourceArea
+			&& d->ContentSourceArea->dockContainer()->isFloating())
+		{
+			containerOverlay = d->ContentSourceArea->dockContainer()->floatingWidget()->containerOverlay();
+			dockAreaOverlay = d->ContentSourceArea->dockContainer()->floatingWidget()->dockAreaOverlay();
+		}
+		else
+		{
+			containerOverlay = d->DockManager->containerOverlay();
+			dockAreaOverlay = d->DockManager->dockAreaOverlay();
+		}
+		auto DockDropArea = dockAreaOverlay->visibleDropAreaUnderCursor();
+		auto ContainerDropArea = containerOverlay->visibleDropAreaUnderCursor();
+		auto SourceContainer = d->ContentSourceArea ? d->ContentSourceArea->dockContainer() : nullptr;
+		bool target_had_independent = d->DropContainer ? d->DropContainer->hasIndependentWidget() : false;
+		bool source_had_independent = SourceContainer ? SourceContainer->hasIndependentWidget() : false;
 		if (!d->DropContainer)
 		{
 			d->createFloatingWidget();
@@ -425,8 +376,43 @@ namespace ads
 		{
 			d->createFloatingWidget();
 		}
-
+		if (SourceContainer) SourceContainer->fetchIndependentCount();
+		if (d->DropContainer) d->DropContainer->fetchIndependentCount();
+		// Case - Existing Floating Drop Container is just changed
+		auto SourceFloatingContainer = SourceContainer ? SourceContainer->floatingWidget() : nullptr;
+		auto DropFloatingContainer = d->DropContainer ? d->DropContainer->floatingWidget() : nullptr;
+		if (d->DropContainer
+			&& d->DropContainer->isFloating()					// Target is FDC
+			&& (ContainerDropArea != InvalidDockWidgetArea
+				|| DockDropArea != InvalidDockWidgetArea)		// Target exists
+			&& (SourceFloatingContainer != DropFloatingContainer) // No update if the widget is dropped into itself
+			)
+		{
+			// Check if the independence of this floating container changed by this drop
+			bool target_has_independent = d->DropContainer ? d->DropContainer->hasIndependentWidget() : false;;
+			if (target_has_independent != target_had_independent)
+			{
+				CFloatingDockContainer* RestoredFloatingWidget = DropFloatingContainer->moveContainerAndDelete();
+			}
+		}
+		// Case - Source Container was Also Changed
+		if (SourceContainer
+			&& SourceContainer->isFloating()
+			&& (SourceFloatingContainer != DropFloatingContainer) // No update if the widget is dropped into itself
+			)
+		{
+			bool source_has_independent = SourceContainer ? SourceContainer->hasIndependentWidget() : false;
+			if (source_has_independent != source_had_independent)
+			{
+				CFloatingDockContainer* RestoredFloatingWidget = SourceFloatingContainer->moveContainerAndDelete();
+				containerOverlay = nullptr;
+				dockAreaOverlay = nullptr;
+				d->ContentSourceArea = nullptr;
+			}
+		}
 		this->close();
+		if (containerOverlay) containerOverlay->hideOverlay();
+		if (dockAreaOverlay) dockAreaOverlay->hideOverlay();
 		d->DockManager->containerOverlay()->hideOverlay();
 		d->DockManager->dockAreaOverlay()->hideOverlay();
 	}

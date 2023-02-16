@@ -50,7 +50,7 @@ namespace ads
 	class ADS_EXPORT CDockAreaTitleBar : public QFrame
 	{
 		Q_PROPERTY(bool focused READ isFocused)
-			Q_OBJECT
+		Q_OBJECT
 	private:
 		DockAreaTitleBarPrivate* d; ///< private data (pimpl)
 		friend struct DockAreaTitleBarPrivate;

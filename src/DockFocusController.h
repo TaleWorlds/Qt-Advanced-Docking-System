@@ -16,73 +16,73 @@
 
 namespace ads
 {
-struct DockFocusControllerPrivate;
-class CDockManager;
-class CFloatingDockContainer;
-
-/**
- * Manages focus styling of dock widgets and handling of focus changes
- */
-class ADS_EXPORT CDockFocusController : public QObject
-{
-	Q_OBJECT
-private:
-	DockFocusControllerPrivate* d; ///< private data (pimpl)
-    friend struct DockFocusControllerPrivate;
-
-private Q_SLOTS:
-	void onApplicationFocusChanged(QWidget *old, QWidget *now);
-	void onFocusWindowChanged(QWindow *focusWindow);
-	void onFocusedDockAreaViewToggled(bool Open);
-	void onStateRestored();
-	void onDockWidgetVisibilityChanged(bool Visible);
-
-public:
-	using Super = QObject;
-	/**
-	 * Default Constructor
-	 */
-	CDockFocusController(CDockManager* DockManager);
+	struct DockFocusControllerPrivate;
+	class CDockManager;
+	class CFloatingDockContainer;
 
 	/**
-	 * Virtual Destructor
+	 * Manages focus styling of dock widgets and handling of focus changes
 	 */
-	virtual ~CDockFocusController();
+	class ADS_EXPORT CDockFocusController : public QObject
+	{
+		Q_OBJECT
+	private:
+		DockFocusControllerPrivate* d; ///< private data (pimpl)
+		friend struct DockFocusControllerPrivate;
 
-	/**
-	 * A container needs to call this function if a widget has been dropped
-	 * into it
-	 */
-	void notifyWidgetOrAreaRelocation(QWidget* RelocatedWidget);
+	private Q_SLOTS:
+		void onApplicationFocusChanged(QWidget* old, QWidget* now);
+		void onFocusWindowChanged(QWindow* focusWindow);
+		void onFocusedDockAreaViewToggled(bool Open);
+		void onStateRestored();
+		void onDockWidgetVisibilityChanged(bool Visible);
 
-	/**
-	 * This function is called, if a floating widget has been dropped into
-	 * an new position.
-	 * When this function is called, all dock widgets of the FloatingWidget
-	 * are already inserted into its new position
-	 */
-	void notifyFloatingWidgetDrop(CFloatingDockContainer* FloatingWidget);
+	public:
+		using Super = QObject;
+		/**
+		 * Default Constructor
+		 */
+		CDockFocusController(CDockManager* DockManager);
 
-	/**
-	 * Returns the dock widget that has focus style in the ui or a nullptr if
-	 * not dock widget is painted focused.
-	 */
-	CDockWidget* focusedDockWidget() const;
+		/**
+		 * Virtual Destructor
+		 */
+		virtual ~CDockFocusController();
 
-	/**
-	 * Request focus highlighting for the given dock widget assigned to the tab
-	 * given in Tab parameter
-	 */
-	void setDockWidgetTabFocused(CDockWidgetTab* Tab);
+		/**
+		 * A container needs to call this function if a widget has been dropped
+		 * into it
+		 */
+		void notifyWidgetOrAreaRelocation(QWidget* RelocatedWidget);
 
-public Q_SLOTS:
-	/**
-	 * Request a focus change to the given dock widget
-	 */
-	void setDockWidgetFocused(CDockWidget* focusedNow);
-}; // class DockFocusController
+		/**
+		 * This function is called, if a floating widget has been dropped into
+		 * an new position.
+		 * When this function is called, all dock widgets of the FloatingWidget
+		 * are already inserted into its new position
+		 */
+		void notifyFloatingWidgetDrop(CFloatingDockContainer* FloatingWidget);
+
+		/**
+		 * Returns the dock widget that has focus style in the ui or a nullptr if
+		 * not dock widget is painted focused.
+		 */
+		CDockWidget* focusedDockWidget() const;
+
+		/**
+		 * Request focus highlighting for the given dock widget assigned to the tab
+		 * given in Tab parameter
+		 */
+		void setDockWidgetTabFocused(CDockWidgetTab* Tab);
+
+	public Q_SLOTS:
+		/**
+		 * Request a focus change to the given dock widget
+		 */
+		void setDockWidgetFocused(CDockWidget* focusedNow);
+	}; // class DockFocusController
 }
- // namespace ads
+// namespace ads
 //-----------------------------------------------------------------------------
 #endif // DockFocusControllerH
 

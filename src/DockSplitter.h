@@ -35,48 +35,48 @@
 
 namespace ads
 {
-struct DockSplitterPrivate;
-
-/**
- * Splitter used internally instead of QSplitter with some additional
- * fuctionality.
- */
-class ADS_EXPORT CDockSplitter : public QSplitter
-{
-	Q_OBJECT
-private:
-	DockSplitterPrivate* d;
-	friend struct DockSplitterPrivate;
-
-public:
-	CDockSplitter(QWidget *parent = Q_NULLPTR);
-	CDockSplitter(Qt::Orientation orientation, QWidget *parent = Q_NULLPTR);
+	struct DockSplitterPrivate;
 
 	/**
-	 * Prints debug info
+	 * Splitter used internally instead of QSplitter with some additional
+	 * fuctionality.
 	 */
-	virtual ~CDockSplitter();
+	class ADS_EXPORT CDockSplitter : public QSplitter
+	{
+		Q_OBJECT
+	private:
+		DockSplitterPrivate* d;
+		friend struct DockSplitterPrivate;
 
-	/**
-	 * Returns true, if any of the internal widgets is visible
-	 */
-	bool hasVisibleContent() const;
+	public:
+		CDockSplitter(QWidget* parent = Q_NULLPTR);
+		CDockSplitter(Qt::Orientation orientation, QWidget* parent = Q_NULLPTR);
 
-	/**
-	 * Returns first widget or nullptr if splitter is empty
-	 */
-	QWidget* firstWidget() const;
+		/**
+		 * Prints debug info
+		 */
+		virtual ~CDockSplitter();
 
-	/**
-	 * Returns last widget of nullptr is splitter is empty
-	 */
-	QWidget* lastWidget() const;
+		/**
+		 * Returns true, if any of the internal widgets is visible
+		 */
+		bool hasVisibleContent() const;
 
-    /**
-     * Returns true if the splitter contains central widget of dock manager.
-     */
-    bool isResizingWithContainer() const;
-}; // class CDockSplitter
+		/**
+		 * Returns first widget or nullptr if splitter is empty
+		 */
+		QWidget* firstWidget() const;
+
+		/**
+		 * Returns last widget of nullptr is splitter is empty
+		 */
+		QWidget* lastWidget() const;
+
+		/**
+		 * Returns true if the splitter contains central widget of dock manager.
+		 */
+		bool isResizingWithContainer() const;
+	}; // class CDockSplitter
 
 } // namespace ads
 

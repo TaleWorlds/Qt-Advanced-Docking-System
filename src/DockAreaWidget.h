@@ -324,6 +324,20 @@ namespace ads
 		 */
 		bool isCentralWidgetArea() const;
 
+		/**
+		 * Returns true if this dock area has a DW w/ Independent feature on
+		 */
+		bool hasIndependentWidget() const;
+
+		/**
+		 * Returns the # of Independent DW's in this dock area
+		 */
+		unsigned int independentDockWidgetCount() const;
+
+		/**
+		 * Updates Independent count
+		 */
+		void fetchIndependentCount();
 	public Q_SLOTS:
 		/**
 		 * This activates the tab for the given tab index.

@@ -40,6 +40,9 @@ QT_FORWARD_DECLARE_CLASS(QXmlStreamWriter)
 
 namespace ads
 {
+	static unsigned int zOrderWidgetCounter = 0;
+	static unsigned int zOrderWindowCounter = 0;
+
 	class DockContainerWidgetPrivate;
 	class CDockAreaWidget;
 	class CDockWidget;
@@ -61,7 +64,8 @@ namespace ads
 	 */
 	class ADS_EXPORT CDockContainerWidget : public QFrame
 	{
-		Q_PROPERTY(bool floating READ isFloating)
+		Q_PROPERTY(bool customTitleBar READ floatingWidgetHasCustomTitleBar)
+			Q_PROPERTY(bool floating READ isFloating)
 			Q_OBJECT
 	private:
 		DockContainerWidgetPrivate* d; ///< private data (pimpl)
@@ -163,6 +167,16 @@ namespace ads
 		 */
 		void updateSplitterHandles(QSplitter* splitter);
 
+		/**
+		 * Updates IndependentDWCount
+		 */
+		void fetchIndependentCount();
+
+		/**
+		 * Clears the dock container
+		 */
+		void clear();
+
 	public:
 		/**
 		 * Default Constructor
@@ -190,9 +204,16 @@ namespace ads
 		void removeDockWidget(CDockWidget* Dockwidget);
 
 		/**
-		 * Returns the current zOrderIndex
+		 * Returns the current zOrderWidgetIndex
 		 */
-		virtual unsigned int zOrderIndex() const;
+		virtual unsigned int zOrderWidgetIndex() const;
+
+		/**
+		 * Returns the current zOrderWindowIndex
+		 */
+		virtual unsigned int zOrderWindowIndex() const;
+
+		void setZOrderWindowIndex(unsigned int idx);
 
 		/**
 		 * This function returns true if this container widgets z order index is
@@ -243,6 +264,8 @@ namespace ads
 		 * DockWidgetIndependent flag
 		 */
 		bool hasIndependentWidget() const;
+
+		bool floatingWidgetHasCustomTitleBar() const;
 
 		/**
 		 * Returns the number of dock areas in this container

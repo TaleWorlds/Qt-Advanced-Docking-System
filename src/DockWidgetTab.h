@@ -37,156 +37,156 @@
 
 namespace ads
 {
-class CDockWidget;
-class CDockAreaWidget;
-struct DockWidgetTabPrivate;
-class CDockManager;
-
-/**
- * A dock widget tab that shows a title and an icon.
- * The dock widget tab is shown in the dock area title bar to switch between
- * tabbed dock widgets
- */
-class ADS_EXPORT CDockWidgetTab : public QFrame
-{
-	Q_OBJECT
-	Q_PROPERTY(bool activeTab READ isActiveTab WRITE setActiveTab NOTIFY activeTabChanged)
-	Q_PROPERTY(QSize iconSize READ iconSize WRITE setIconSize)
-
-private:
-	DockWidgetTabPrivate* d; ///< private data (pimpl)
-	friend struct DockWidgetTabPrivate;
-	friend class CDockWidget;
-	friend class CDockManager;
-	void onDockWidgetFeaturesChanged();
-
-private Q_SLOTS:
-	void detachDockWidget();
-
-protected:
-	virtual void mousePressEvent(QMouseEvent* ev) override;
-	virtual void mouseReleaseEvent(QMouseEvent* ev) override;
-	virtual void mouseMoveEvent(QMouseEvent* ev) override;
-	virtual void contextMenuEvent(QContextMenuEvent* ev) override;
+	class CDockWidget;
+	class CDockAreaWidget;
+	struct DockWidgetTabPrivate;
+	class CDockManager;
 
 	/**
-	 * Double clicking the tab widget makes the assigned dock widget floating
+	 * A dock widget tab that shows a title and an icon.
+	 * The dock widget tab is shown in the dock area title bar to switch between
+	 * tabbed dock widgets
 	 */
-	virtual void mouseDoubleClickEvent(QMouseEvent *event) override;
+	class ADS_EXPORT CDockWidgetTab : public QFrame
+	{
+		Q_OBJECT
+			Q_PROPERTY(bool activeTab READ isActiveTab WRITE setActiveTab NOTIFY activeTabChanged)
+			Q_PROPERTY(QSize iconSize READ iconSize WRITE setIconSize)
 
-public:
-	using Super = QFrame;
-	/**
-	 * Default Constructor
-	 * param[in] DockWidget The dock widget this title bar belongs to
-	 * param[in] parent The parent widget of this title bar
-	 */
-	CDockWidgetTab(CDockWidget* DockWidget, QWidget* parent = 0);
+	private:
+		DockWidgetTabPrivate* d; ///< private data (pimpl)
+		friend struct DockWidgetTabPrivate;
+		friend class CDockWidget;
+		friend class CDockManager;
+		void onDockWidgetFeaturesChanged();
 
-	/**
-	 * Virtual Destructor
-	 */
-	virtual ~CDockWidgetTab();
+	private Q_SLOTS:
+		void detachDockWidget();
 
-	/**
-	 * Returns true, if this is the active tab
-	 */
-	bool isActiveTab() const;
+	protected:
+		virtual void mousePressEvent(QMouseEvent* ev) override;
+		virtual void mouseReleaseEvent(QMouseEvent* ev) override;
+		virtual void mouseMoveEvent(QMouseEvent* ev) override;
+		virtual void contextMenuEvent(QContextMenuEvent* ev) override;
 
-	/**
-	 * Set this true to make this tab the active tab
-	 */
-	void setActiveTab(bool active);
+		/**
+		 * Double clicking the tab widget makes the assigned dock widget floating
+		 */
+		virtual void mouseDoubleClickEvent(QMouseEvent* event) override;
 
-	/**
-	 * Sets the dock area widget the dockWidget returned by dockWidget()
-	 * function belongs to.
-	 */
-	void setDockAreaWidget(CDockAreaWidget* DockArea);
+	public:
+		using Super = QFrame;
+		/**
+		 * Default Constructor
+		 * param[in] DockWidget The dock widget this title bar belongs to
+		 * param[in] parent The parent widget of this title bar
+		 */
+		CDockWidgetTab(CDockWidget* DockWidget, QWidget* parent = 0);
 
-	/**
-	 * Returns the dock area widget this title bar belongs to.
-	 * \return This function returns 0 if the dock widget that owns this title
-	 * bar widget has not been added to any dock area yet.
-	 */
-	CDockAreaWidget* dockAreaWidget() const;
+		/**
+		 * Virtual Destructor
+		 */
+		virtual ~CDockWidgetTab();
 
-	/**
-	 * Returns the dock widget this title widget belongs to
-	 */
-	CDockWidget* dockWidget() const;
+		/**
+		 * Returns true, if this is the active tab
+		 */
+		bool isActiveTab() const;
 
-	/**
-	 * Sets the icon to show in title bar
-	 */
-	void setIcon(const QIcon& Icon);
+		/**
+		 * Set this true to make this tab the active tab
+		 */
+		void setActiveTab(bool active);
 
-	/**
-	 * Returns the icon
-	 */
-	const QIcon& icon() const;
+		/**
+		 * Sets the dock area widget the dockWidget returned by dockWidget()
+		 * function belongs to.
+		 */
+		void setDockAreaWidget(CDockAreaWidget* DockArea);
 
-	/**
-	 * Returns the tab text
-	 */
-	QString text() const;
+		/**
+		 * Returns the dock area widget this title bar belongs to.
+		 * \return This function returns 0 if the dock widget that owns this title
+		 * bar widget has not been added to any dock area yet.
+		 */
+		CDockAreaWidget* dockAreaWidget() const;
 
-	/**
-	 * Sets the tab text
-	 */
-	void setText(const QString& title);
+		/**
+		 * Returns the dock widget this title widget belongs to
+		 */
+		CDockWidget* dockWidget() const;
 
-	/**
-	 * Returns true if text is elided on the tab's title
-	 */
-	bool isTitleElided() const;
+		/**
+		 * Sets the icon to show in title bar
+		 */
+		void setIcon(const QIcon& Icon);
 
-	/**
-	 * This function returns true if the assigned dock widget is closable
-	 */
-	bool isClosable() const;
+		/**
+		 * Returns the icon
+		 */
+		const QIcon& icon() const;
 
-	/**
-	* Track event ToolTipChange and set child ToolTip 
-	*/
-	virtual bool event(QEvent *e) override;
+		/**
+		 * Returns the tab text
+		 */
+		QString text() const;
 
-	/**
-	 * Sets the text elide mode
-	 */
-	void setElideMode(Qt::TextElideMode mode);
+		/**
+		 * Sets the tab text
+		 */
+		void setText(const QString& title);
 
-	/**
-	 * Update stylesheet style if a property changes
-	 */
-	void updateStyle();
+		/**
+		 * Returns true if text is elided on the tab's title
+		 */
+		bool isTitleElided() const;
 
-	/**
-	 * Returns the icon size.
-	 * If no explicit icon size has been set, the function returns an invalid
-	 * QSize
-	 */
-	QSize iconSize() const;
+		/**
+		 * This function returns true if the assigned dock widget is closable
+		 */
+		bool isClosable() const;
 
-	/**
-	 * Set an explicit icon size.
-	 * If no icon size has been set explicitely, than the tab sets the icon size
-	 * depending on the style
-	 */
-	void setIconSize(const QSize& Size);
+		/**
+		* Track event ToolTipChange and set child ToolTip
+		*/
+		virtual bool event(QEvent* e) override;
 
-public Q_SLOTS:
-	virtual void setVisible(bool visible) override;
+		/**
+		 * Sets the text elide mode
+		 */
+		void setElideMode(Qt::TextElideMode mode);
 
-Q_SIGNALS:
-	void activeTabChanged();
-	void clicked();
-	void closeRequested();
-	void closeOtherTabsRequested();
-	void moved(const QPoint& GlobalPos);
-	void elidedChanged(bool elided);
-}; // class DockWidgetTab
+		/**
+		 * Update stylesheet style if a property changes
+		 */
+		void updateStyle();
+
+		/**
+		 * Returns the icon size.
+		 * If no explicit icon size has been set, the function returns an invalid
+		 * QSize
+		 */
+		QSize iconSize() const;
+
+		/**
+		 * Set an explicit icon size.
+		 * If no icon size has been set explicitely, than the tab sets the icon size
+		 * depending on the style
+		 */
+		void setIconSize(const QSize& Size);
+
+	public Q_SLOTS:
+		virtual void setVisible(bool visible) override;
+
+	Q_SIGNALS:
+		void activeTabChanged();
+		void clicked();
+		void closeRequested();
+		void closeOtherTabsRequested();
+		void moved(const QPoint& GlobalPos);
+		void elidedChanged(bool elided);
+	}; // class DockWidgetTab
 }
- // namespace ads
+// namespace ads
 //-----------------------------------------------------------------------------
 #endif // DockWidgetTabH

@@ -43,18 +43,18 @@ class QStatusBar;
 namespace ads
 {
 	struct FloatingDockContainerPrivate;
-	class CDockManager;
-	struct DockManagerPrivate;
+	class CFloatingWidgetTitleBar;
 	class CDockAreaWidget;
-	class CDockContainerWidget;
-	class CDockWidget;
-	class CDockManager;
 	class CDockAreaTabBar;
-	class CDockWidgetTab;
-	struct DockWidgetTabPrivate;
 	class CDockAreaTitleBar;
 	struct DockAreaTitleBarPrivate;
-	class CFloatingWidgetTitleBar;
+	class CDockContainerWidget;
+	class CDockContainerWidgetPrivate;
+	class CDockManager;
+	struct DockManagerPrivate;
+	class CDockWidgetTab;
+	struct DockWidgetTabPrivate;
+	class CDockOverlay;
 	class CDockingStateReader;
 
 	/**
@@ -104,21 +104,19 @@ namespace ads
 	private:
 		FloatingDockContainerPrivate* d; ///< private data (pimpl)
 		friend struct FloatingDockContainerPrivate;
+		friend class CDockAreaTabBar;
+		friend class CDockContainerWidget;
+		friend class CDockContainerWidgetPrivate;
 		friend class CDockManager;
 		friend struct DockManagerPrivate;
-		friend class CDockAreaTabBar;
-		friend struct DockWidgetTabPrivate;
 		friend class CDockWidgetTab;
+		friend struct DockWidgetTabPrivate;
 		friend class CDockAreaTitleBar;
 		friend struct DockAreaTitleBarPrivate;
 		friend class CDockWidget;
 		friend class CDockAreaWidget;
 		friend class CFloatingWidgetTitleBar;
 
-		/**
-		 * Must be called on constructor only
-		 */
-		void decideNative(QWidget* w = nullptr);
 	private Q_SLOTS:
 		void onDockAreasAddedOrRemoved();
 		void onDockAreaCurrentChanged(int Index);
@@ -213,13 +211,9 @@ namespace ads
 
 		/**
 		 * Create empty floating widget - required for restore state
+		 * independent info is also needed to be parsed before creation, assumed false
 		 */
-		CFloatingDockContainer(CDockManager* DockManager, bool inheritance_flag = false);
-
-		/**
-		 * Create floating widget with the given dock container
-		 */
-		CFloatingDockContainer(CDockManager* DockManager, CDockContainerWidget* DockContainer);
+		CFloatingDockContainer(CDockManager* DockManager, bool independent = false);
 
 		/**
 		 * Create floating widget with the given dock area
@@ -232,7 +226,6 @@ namespace ads
 		CFloatingDockContainer(CDockWidget* DockWidget);
 
 
-
 		/**
 		 * Virtual Destructor
 		 */
@@ -242,6 +235,11 @@ namespace ads
 		 * Access function for the internal dock container
 		 */
 		CDockContainerWidget* dockContainer() const;
+
+		/**
+		 * Clones the widget elsewhere and deletes this widget
+		 */
+		CFloatingDockContainer* moveContainerAndDelete();
 
 		/**
 		 * This function returns true, if it can be closed.
@@ -311,6 +309,18 @@ namespace ads
 		 * the floating widget has a QWidget based title bar
 		 */
 		bool hasNativeTitleBar();
+
+		/**
+		 * Returns the independent container overlay of this
+		 * independent floating container, if it has any
+		 */
+		CDockOverlay* containerOverlay();
+
+		/**
+		 * Returns the independent dock area overlay of this
+		 * independent floating container, if it has any
+		 */
+		CDockOverlay* dockAreaOverlay();
 		//#endif
 
 	}; // class FloatingDockContainer

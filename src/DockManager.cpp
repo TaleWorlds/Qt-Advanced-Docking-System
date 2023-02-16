@@ -211,51 +211,40 @@ namespace ads
 		bool Result = false;
 		if (Index >= Containers.count())
 		{
-			CFloatingDockContainer* FloatingWidget = new CFloatingDockContainer(_this);
+			bool IsIndependent = stream.attributes().value("Independent").toInt();
+			CFloatingDockContainer* FloatingWidget = new CFloatingDockContainer(_this, IsIndependent);
 			Result = FloatingWidget->restoreState(stream, Testing);
-			auto Container = FloatingWidget->dockContainer();
-			if (FloatingWidget
-				&& Container
-				&& Container->hasIndependentWidget())
-			{
-				QByteArray b = FloatingWidget->saveGeometry();
-				QWidget* w = new QWidget(FloatingWidget);
-				FloatingWidget->setWidget(w);
-				Container->setParent(nullptr);
-				CFloatingDockContainer* RestoredFloatingWidget = new CFloatingDockContainer(_this, Container);
-				RestoredFloatingWidget->restoreGeometry(b);
-				RestoredFloatingWidget->show();
-				FloatingWidget->hide();
-				delete FloatingWidget; // important to use delete instead of deleteLater
-			}
+			FloatingWidget->dockContainer()->fetchIndependentCount();
 		}
-		else
+		else if (Index >= 0)
 		{
-			ADS_PRINT("d->Containers[i]->restoreState "); // Comes here from setPerspective
+			ADS_PRINT("d->Containers[i]->restoreState "); // setPerspective case
 			auto Container = Containers[Index];
 			if (Container->isFloating())
 			{
 				CFloatingDockContainer* FloatingWidget = Container->floatingWidget();
-				Result = FloatingWidget->restoreState(stream, Testing);
-				if (FloatingWidget
-					&& Container
-					&& Container->hasIndependentWidget())
+				bool IsIndependent = stream.attributes().value("Independent").toInt();
+				if (!IsIndependent)
 				{
-					QByteArray b = FloatingWidget->saveGeometry();
-					QWidget* w = new QWidget(FloatingWidget);
-					FloatingWidget->setWidget(w);
-					Container->setParent(nullptr);
-					CFloatingDockContainer* RestoredFloatingWidget = new CFloatingDockContainer(_this, Container);
-					RestoredFloatingWidget->restoreGeometry(b);
-					RestoredFloatingWidget->show();
-					FloatingWidget->hide();
-					delete FloatingWidget; // important to use delete instead of deleteLater
+					Result = FloatingWidget->restoreState(stream, Testing);
+				}
+				else
+				{
+					FloatingWidget->hideAndDeleteLater();
+					FloatingWidget = new CFloatingDockContainer(_this, IsIndependent);
+					FloatingWidget->restoreState(stream, Testing);
+					FloatingWidget->dockContainer()->fetchIndependentCount();
 				}
 			}
 			else
 			{
 				Result = Container->restoreState(stream, Testing);
+				Container->fetchIndependentCount();
 			}
+		}
+		else
+		{
+			Result = false;
 		}
 		return Result;
 	}
@@ -710,11 +699,10 @@ namespace ads
 
 
 	//============================================================================
-	unsigned int CDockManager::zOrderIndex() const
+	unsigned int CDockManager::zOrderWidgetIndex() const
 	{
 		return 0;
 	}
-
 
 	//============================================================================
 	QByteArray CDockManager::saveState(int version) const
@@ -724,20 +712,23 @@ namespace ads
 		auto ConfigFlags = CDockManager::configFlags();
 		s.setAutoFormatting(ConfigFlags.testFlag(XmlAutoFormattingEnabled));
 		s.writeStartDocument();
-		s.writeStartElement("QtAdvancedDockingSystem");
-		s.writeAttribute("Version", QString::number(CurrentVersion));
-		s.writeAttribute("UserVersion", QString::number(version));
-		s.writeAttribute("Containers", QString::number(d->Containers.count()));
-		if (d->CentralWidget)
 		{
-			s.writeAttribute("CentralWidget", d->CentralWidget->objectName());
-		}
-		for (auto Container : d->Containers)
-		{
-			Container->saveState(s);
-		}
+			s.writeStartElement("QtAdvancedDockingSystem");
+			s.writeAttribute("Version", QString::number(CurrentVersion));
+			s.writeAttribute("UserVersion", QString::number(version));
+			s.writeAttribute("Containers", QString::number(d->Containers.count()));
+			if (d->CentralWidget)
+			{
+				s.writeAttribute("CentralWidget", d->CentralWidget->objectName());
+			}
+			for (auto Container : d->Containers)
+			{
+				Container->fetchIndependentCount();
+				Container->saveState(s);
+			}
 
-		s.writeEndElement();
+			s.writeEndElement();
+		}
 		s.writeEndDocument();
 
 		return ConfigFlags.testFlag(XmlCompressionEnabled)

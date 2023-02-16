@@ -13,17 +13,17 @@
 namespace ads
 {
 
-//============================================================================
-void CDockingStateReader::setFileVersion(int FileVersion)
-{
-	m_FileVersion = FileVersion;
-}
+	//============================================================================
+	void CDockingStateReader::setFileVersion(int FileVersion)
+	{
+		m_FileVersion = FileVersion;
+	}
 
-//============================================================================
-int CDockingStateReader::fileVersion() const
-{
-	return m_FileVersion;
-}
+	//============================================================================
+	int CDockingStateReader::fileVersion() const
+	{
+		return m_FileVersion;
+	}
 } // namespace ads
 
 //---------------------------------------------------------------------------

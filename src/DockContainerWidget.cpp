@@ -80,7 +80,6 @@ QByteArray qByteArrayToHex(const QByteArray& src, char separator)
 
 namespace ads
 {
-	static unsigned int zOrderCounter = 0;
 
 	enum eDropMode
 	{
@@ -129,13 +128,15 @@ namespace ads
 	public:
 		CDockContainerWidget* _this;
 		QPointer<CDockManager> DockManager;
-		unsigned int zOrderIndex = 0;
+		unsigned int zOrderWidgetIndex = 0;
+		unsigned int zOrderWindowIndex = 0;
 		QList<CDockAreaWidget*> DockAreas;
 		QGridLayout* Layout = nullptr;
 		QSplitter* RootSplitter = nullptr;
 		bool isFloating = false;
 		CDockAreaWidget* LastAddedAreaCache[5];
 		int VisibleDockAreaCount = -1;
+		unsigned int IndependentDWCount = 0;
 		CDockAreaWidget* TopLevelDockArea = nullptr;
 
 		/**
@@ -359,11 +360,24 @@ namespace ads
 	{
 		CDockAreaWidget* DockArea = _this->dockAreaAt(TargetPos);
 		auto dropArea = InvalidDockWidgetArea;
-		auto ContainerDropArea = DockManager->containerOverlay()->dropAreaUnderCursor();
+		CDockOverlay* ContainerOverlay = 0;
+		CDockOverlay* DockAreaOverlay = 0;
+		if (isFloating)
+		{
+			CFloatingDockContainer* FloatingWidget = _this->floatingWidget();
+			ContainerOverlay = FloatingWidget->containerOverlay();
+			DockAreaOverlay = FloatingWidget->dockAreaOverlay();
+		}
+		else
+		{
+			ContainerOverlay = DockManager->containerOverlay();
+			DockAreaOverlay = DockManager->dockAreaOverlay();
+		}
+		auto ContainerDropArea = ContainerOverlay->dropAreaUnderCursor();
 
 		if (DockArea)
 		{
-			auto dropOverlay = DockManager->dockAreaOverlay();
+			auto dropOverlay = DockAreaOverlay;
 			dropOverlay->setAllowedAreas(DockArea->allowedAreas());
 			dropArea = dropOverlay->showOverlay(DockArea);
 			if (ContainerDropArea != InvalidDockWidgetArea &&
@@ -1329,6 +1343,10 @@ namespace ads
 		}
 
 		Dockwidget->setDockManager(d->DockManager);
+		if (Dockwidget->features().testFlag(CDockWidget::DockWidgetIndependent))
+		{
+			d->IndependentDWCount++;
+		}
 		if (DockAreaWidget)
 		{
 			return d->addDockWidgetToDockArea(area, Dockwidget, DockAreaWidget);
@@ -1345,21 +1363,51 @@ namespace ads
 		CDockAreaWidget* Area = Dockwidget->dockAreaWidget();
 		if (Area)
 		{
+			if (Dockwidget->features().testFlag(CDockWidget::DockWidgetIndependent))
+			{
+				d->IndependentDWCount--;
+			}
 			Area->removeDockWidget(Dockwidget);
 		}
 	}
 
 	//============================================================================
-	unsigned int CDockContainerWidget::zOrderIndex() const
+	unsigned int CDockContainerWidget::zOrderWidgetIndex() const
 	{
-		return d->zOrderIndex;
+		return d->zOrderWidgetIndex;
 	}
 
+
+	unsigned int CDockContainerWidget::zOrderWindowIndex() const
+	{
+		if ((isFloating() && hasIndependentWidget())
+			|| dynamic_cast<const CDockManager*>(this))
+		{
+			return d->zOrderWindowIndex;
+		}
+		else
+		{
+			return d->DockManager->zOrderWindowIndex();
+		}
+	}
+
+	void CDockContainerWidget::setZOrderWindowIndex(unsigned int idx)
+	{
+		d->zOrderWindowIndex = idx;
+	}
 
 	//============================================================================
 	bool CDockContainerWidget::isInFrontOf(CDockContainerWidget* Other) const
 	{
-		return this->zOrderIndex() > Other->zOrderIndex();
+		if (zOrderWindowIndex() == Other->zOrderWindowIndex())
+		{
+			return (zOrderWidgetIndex() > Other->zOrderWidgetIndex());
+		}
+		else
+		{
+			return (zOrderWindowIndex() > Other->zOrderWindowIndex());
+		}
+
 	}
 
 
@@ -1369,16 +1417,32 @@ namespace ads
 		bool Result = QWidget::event(e);
 		if (e->type() == QEvent::WindowActivate)
 		{
-			d->zOrderIndex = ++zOrderCounter;
+			if ((isFloating() && hasIndependentWidget())
+				|| dynamic_cast<CDockManager*>(this))
+			{
+				d->zOrderWindowIndex = ++zOrderWindowCounter;
+			}
+			else
+			{
+				d->DockManager->setZOrderWindowIndex(++zOrderWindowCounter);
+			}
+			d->zOrderWidgetIndex = ++zOrderWidgetCounter;
 		}
-		else if (e->type() == QEvent::Show && !d->zOrderIndex)
+		else if (e->type() == QEvent::Show && !d->zOrderWidgetIndex)
 		{
-			d->zOrderIndex = ++zOrderCounter;
+			if ((isFloating() && hasIndependentWidget())
+				|| dynamic_cast<CDockManager*>(this))
+			{
+				d->zOrderWindowIndex = ++zOrderWindowCounter;
+			}
+			else
+			{
+				d->DockManager->setZOrderWindowIndex(++zOrderWindowCounter);
+			}
+			d->zOrderWidgetIndex = ++zOrderWidgetCounter;
 		}
-
 		return Result;
 	}
-
 
 	//============================================================================
 	void CDockContainerWidget::addDockArea(CDockAreaWidget* DockAreaWidget,
@@ -1389,16 +1453,16 @@ namespace ads
 		{
 			Container->removeDockArea(DockAreaWidget);
 		}
-
+		d->IndependentDWCount += DockAreaWidget->independentDockWidgetCount();
 		d->addDockArea(DockAreaWidget, area);
 	}
-
 
 	//============================================================================
 	void CDockContainerWidget::removeDockArea(CDockAreaWidget* area)
 	{
 		ADS_PRINT("CDockContainerWidget::removeDockArea");
 		area->disconnect(this);
+		d->IndependentDWCount -= area->independentDockWidgetCount();
 		d->DockAreas.removeAll(area);
 		CDockSplitter* Splitter = internal::findParent<CDockSplitter*>(area);
 
@@ -1534,13 +1598,25 @@ namespace ads
 		CDockWidget* SingleDroppedDockWidget = FloatingWidget->topLevelDockWidget();
 		CDockWidget* SingleDockWidget = topLevelDockWidget();
 		CDockAreaWidget* DockArea = dockAreaAt(TargetPos);
+		CDockOverlay* ContainerOverlay = 0;
+		CDockOverlay* DockAreaOverlay = 0;
+		if (!FloatingWidget->dockContainer()->hasIndependentWidget())
+		{
+			ContainerOverlay = d->DockManager->containerOverlay();
+			DockAreaOverlay = d->DockManager->dockAreaOverlay();
+		}
+		else
+		{
+			ContainerOverlay = FloatingWidget->containerOverlay();
+			DockAreaOverlay = FloatingWidget->dockAreaOverlay();
+		}
 		auto dropArea = InvalidDockWidgetArea;
-		auto ContainerDropArea = d->DockManager->containerOverlay()->dropAreaUnderCursor();
+		auto ContainerDropArea = ContainerOverlay->dropAreaUnderCursor();
 		bool Dropped = false;
 
 		if (DockArea)
 		{
-			auto dropOverlay = d->DockManager->dockAreaOverlay();
+			auto dropOverlay = DockAreaOverlay;
 			dropOverlay->setAllowedAreas(DockArea->allowedAreas());
 			dropArea = dropOverlay->showOverlay(DockArea);
 			if (ContainerDropArea != InvalidDockWidgetArea &&
@@ -1668,6 +1744,7 @@ namespace ads
 			<< isFloating());
 
 		s.writeStartElement("Container");
+		s.writeAttribute("Independent", QString::number(hasIndependentWidget() ? 1 : 0));
 		s.writeAttribute("Floating", QString::number(isFloating() ? 1 : 0));
 		if (isFloating())
 		{
@@ -1809,19 +1886,23 @@ namespace ads
 	//============================================================================
 	bool CDockContainerWidget::hasIndependentWidget() const
 	{
-		for (int j = 0; j < dockAreaCount(); j++)
+		return (bool)d->IndependentDWCount;
+	}
+
+	bool CDockContainerWidget::floatingWidgetHasCustomTitleBar() const
+	{
+		if (!isFloating())
 		{
-			auto DA = dockArea(j);
-			for (int i = 0; DA && i < DA->dockWidgetsCount(); i++)
-			{
-				auto DW = DA->dockWidget(i);
-				if (DW && DW->features().testFlag(CDockWidget::DockWidgetIndependent))
-				{
-					return true;
-				}
-			}
+			return false;
 		}
-		return false;
+		else if (floatingWidget() && !floatingWidget()->hasNativeTitleBar())
+		{
+			return true;
+		}
+		else
+		{
+			return false;
+		}
 	}
 
 	//============================================================================
@@ -1876,6 +1957,35 @@ namespace ads
 		d->updateSplitterHandles(splitter);
 	}
 
+
+	void CDockContainerWidget::fetchIndependentCount()
+	{
+		d->IndependentDWCount = 0;
+		for (int j = 0; j < dockAreaCount(); j++)
+		{
+			auto DA = dockArea(j);
+			DA->fetchIndependentCount();
+			d->IndependentDWCount += DA->independentDockWidgetCount();
+		}
+	}
+
+	void CDockContainerWidget::clear()
+	{
+		d->VisibleDockAreaCount = -1;// invalidate the dock area count
+		for (int i = 0; i < d->DockAreas.count(); i++)
+		{
+			d->DockAreas[i]->hide();
+			d->Layout->removeWidget(d->DockAreas[i]);
+			auto DA = d->DockAreas[i];
+			for (int j = 0; j < DA->dockWidgetsCount(); j++)
+			{
+				d->DockAreas[i]->removeDockWidget(DA->dockWidget(j));
+			}
+		}
+		d->DockAreas.clear();
+		std::fill(std::begin(d->LastAddedAreaCache), std::end(d->LastAddedAreaCache), nullptr);
+		d->TopLevelDockArea = nullptr;
+	}
 
 	//============================================================================
 	CDockWidget::DockWidgetFeatures CDockContainerWidget::features() const

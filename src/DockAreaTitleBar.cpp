@@ -226,9 +226,9 @@ namespace ads
 		{
 			auto w = new CFloatingDragPreview(DockArea);
 			QObject::connect(w, &CFloatingDragPreview::draggingCanceled, [=]()
-				{
-					this->DragState = DraggingInactive;
-				});
+			{
+				this->DragState = DraggingInactive;
+			});
 			FloatingWidget = w;
 		}
 
@@ -546,7 +546,12 @@ namespace ads
 		{
 			ADS_PRINT("CDockAreaTitlBar::startFloating");
 			d->startFloating(d->DragStartMousePos);
+			CFloatingDockContainer* FloatingWidget = d->DockArea->dockContainer()->floatingWidget();
 			auto Overlay = d->DockArea->dockManager()->containerOverlay();
+			if (FloatingWidget)
+			{
+				Overlay = FloatingWidget->containerOverlay();
+			}
 			Overlay->setAllowedAreas(OuterDockAreas);
 		}
 

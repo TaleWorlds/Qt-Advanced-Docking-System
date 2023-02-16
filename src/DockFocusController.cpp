@@ -30,382 +30,382 @@
 
 namespace ads
 {
-static const char* const FocusedDockWidgetProperty = "FocusedDockWidget";
-
-/**
- * Private data class of CDockFocusController class (pimpl)
- */
-struct DockFocusControllerPrivate
-{
-	CDockFocusController *_this;
-	QPointer<CDockWidget> FocusedDockWidget = nullptr;
-	QPointer<CDockAreaWidget> FocusedArea = nullptr;
-	CDockWidget* OldFocusedDockWidget = nullptr;
-/*#ifdef Q_OS_LINUX*/
-     QPointer<CFloatingDockContainer> FloatingWidget = nullptr;
-/*#endif*/
-	CDockManager* DockManager;
-    bool ForceFocusChangedSignal = false;
+	static const char* const FocusedDockWidgetProperty = "FocusedDockWidget";
 
 	/**
-	 * Private data constructor
+	 * Private data class of CDockFocusController class (pimpl)
 	 */
-	DockFocusControllerPrivate(CDockFocusController *_public);
-
-	/**
-	 * This function updates the focus style of the given dock widget and
-	 * the dock area that it belongs to
-	 */
-	void updateDockWidgetFocus(CDockWidget* DockWidget);
-}; // struct DockFocusControllerPrivate
-
-
-
-//===========================================================================
-static void updateDockWidgetFocusStyle(CDockWidget* DockWidget, bool Focused)
-{
-	DockWidget->setProperty("focused", Focused);
-	DockWidget->tabWidget()->setProperty("focused", Focused);
-	DockWidget->tabWidget()->updateStyle();
-	internal::repolishStyle(DockWidget);
-}
-
-
-//===========================================================================
-static void updateDockAreaFocusStyle(CDockAreaWidget* DockArea, bool Focused)
-{
-	DockArea->setProperty("focused", Focused);
-	internal::repolishStyle(DockArea);
-	internal::repolishStyle(DockArea->titleBar());
-}
-
-
-//===========================================================================
-/*#ifdef Q_OS_LINUX*/
-static void updateFloatingWidgetFocusStyle(CFloatingDockContainer* FloatingWidget, bool Focused)
-{
-	if (FloatingWidget->hasNativeTitleBar())
+	struct DockFocusControllerPrivate
 	{
-		return;
-	}
-    auto TitleBar = qobject_cast<CFloatingWidgetTitleBar*>(FloatingWidget->titleBarWidget());
-    if (!TitleBar)
-    {
-        return;
-    }
-    TitleBar->setProperty("focused", Focused);
-    TitleBar->updateStyle();
-}
-/*#endif*/
+		CDockFocusController* _this;
+		QPointer<CDockWidget> FocusedDockWidget = nullptr;
+		QPointer<CDockAreaWidget> FocusedArea = nullptr;
+		CDockWidget* OldFocusedDockWidget = nullptr;
+		/*#ifdef Q_OS_LINUX*/
+		QPointer<CFloatingDockContainer> FloatingWidget = nullptr;
+		/*#endif*/
+		CDockManager* DockManager;
+		bool ForceFocusChangedSignal = false;
+
+		/**
+		 * Private data constructor
+		 */
+		DockFocusControllerPrivate(CDockFocusController* _public);
+
+		/**
+		 * This function updates the focus style of the given dock widget and
+		 * the dock area that it belongs to
+		 */
+		void updateDockWidgetFocus(CDockWidget* DockWidget);
+	}; // struct DockFocusControllerPrivate
 
 
-//============================================================================
-DockFocusControllerPrivate::DockFocusControllerPrivate(
-    CDockFocusController *_public) :
-	_this(_public)
-{
 
-}
-
-
-//============================================================================
-void DockFocusControllerPrivate::updateDockWidgetFocus(CDockWidget* DockWidget)
-{
-	if (!DockWidget->features().testFlag(CDockWidget::DockWidgetFocusable))
+	//===========================================================================
+	static void updateDockWidgetFocusStyle(CDockWidget* DockWidget, bool Focused)
 	{
-		return;
+		DockWidget->setProperty("focused", Focused);
+		DockWidget->tabWidget()->setProperty("focused", Focused);
+		DockWidget->tabWidget()->updateStyle();
+		internal::repolishStyle(DockWidget);
 	}
 
-	QWindow* Window = nullptr;
-	auto DockContainer = DockWidget->dockContainer();
-	if (DockContainer)
+
+	//===========================================================================
+	static void updateDockAreaFocusStyle(CDockAreaWidget* DockArea, bool Focused)
 	{
-		Window = DockContainer->window()->windowHandle();
+		DockArea->setProperty("focused", Focused);
+		internal::repolishStyle(DockArea);
+		internal::repolishStyle(DockArea->titleBar());
 	}
 
-	if (Window)
-	{
-        Window->setProperty(FocusedDockWidgetProperty, QVariant::fromValue(QPointer<CDockWidget>(DockWidget)));
-	}
-	CDockAreaWidget* NewFocusedDockArea = nullptr;
-	if (FocusedDockWidget)
-	{
-		updateDockWidgetFocusStyle(FocusedDockWidget, false);
-	}
 
-	CDockWidget* old = FocusedDockWidget;
-	FocusedDockWidget = DockWidget;
-	updateDockWidgetFocusStyle(FocusedDockWidget, true);
-	NewFocusedDockArea = FocusedDockWidget->dockAreaWidget();
-	if (NewFocusedDockArea && (FocusedArea != NewFocusedDockArea))
+	//===========================================================================
+	/*#ifdef Q_OS_LINUX*/
+	static void updateFloatingWidgetFocusStyle(CFloatingDockContainer* FloatingWidget, bool Focused)
 	{
-		if (FocusedArea)
+		if (FloatingWidget->hasNativeTitleBar())
 		{
-			QObject::disconnect(FocusedArea, SIGNAL(viewToggled(bool)), _this, SLOT(onFocusedDockAreaViewToggled(bool)));
-			updateDockAreaFocusStyle(FocusedArea, false);
+			return;
+		}
+		auto TitleBar = qobject_cast<CFloatingWidgetTitleBar*>(FloatingWidget->titleBarWidget());
+		if (!TitleBar)
+		{
+			return;
+		}
+		TitleBar->setProperty("focused", Focused);
+		TitleBar->updateStyle();
+	}
+	/*#endif*/
+
+
+	//============================================================================
+	DockFocusControllerPrivate::DockFocusControllerPrivate(
+		CDockFocusController* _public) :
+		_this(_public)
+	{
+
+	}
+
+
+	//============================================================================
+	void DockFocusControllerPrivate::updateDockWidgetFocus(CDockWidget* DockWidget)
+	{
+		if (!DockWidget->features().testFlag(CDockWidget::DockWidgetFocusable))
+		{
+			return;
 		}
 
-		FocusedArea = NewFocusedDockArea;
-		updateDockAreaFocusStyle(FocusedArea, true);
-		QObject::connect(FocusedArea, SIGNAL(viewToggled(bool)), _this, SLOT(onFocusedDockAreaViewToggled(bool)));
-	}
-
-
-
-    CFloatingDockContainer* NewFloatingWidget = nullptr;
-    DockContainer = FocusedDockWidget->dockContainer();
-    if (DockContainer)
-    {
-    	NewFloatingWidget = DockContainer->floatingWidget();
-    }
-
-    if (NewFloatingWidget)
-    {
-        NewFloatingWidget->setProperty(FocusedDockWidgetProperty, QVariant::fromValue(QPointer<CDockWidget>(DockWidget)));
-    }
-
-
-/*#ifdef Q_OS_LINUX*/
-	// This code is required for styling the floating widget titlebar for linux
-	// depending on the current focus state
-	if (FloatingWidget != NewFloatingWidget)
-	{
-		if (FloatingWidget)
+		QWindow* Window = nullptr;
+		auto DockContainer = DockWidget->dockContainer();
+		if (DockContainer)
 		{
-			updateFloatingWidgetFocusStyle(FloatingWidget, false);
+			Window = DockContainer->window()->windowHandle();
 		}
-		FloatingWidget = NewFloatingWidget;
 
-		if (FloatingWidget)
+		if (Window)
 		{
-			updateFloatingWidgetFocusStyle(FloatingWidget, true);
+			Window->setProperty(FocusedDockWidgetProperty, QVariant::fromValue(QPointer<CDockWidget>(DockWidget)));
+		}
+		CDockAreaWidget* NewFocusedDockArea = nullptr;
+		if (FocusedDockWidget)
+		{
+			updateDockWidgetFocusStyle(FocusedDockWidget, false);
+		}
+
+		CDockWidget* old = FocusedDockWidget;
+		FocusedDockWidget = DockWidget;
+		updateDockWidgetFocusStyle(FocusedDockWidget, true);
+		NewFocusedDockArea = FocusedDockWidget->dockAreaWidget();
+		if (NewFocusedDockArea && (FocusedArea != NewFocusedDockArea))
+		{
+			if (FocusedArea)
+			{
+				QObject::disconnect(FocusedArea, SIGNAL(viewToggled(bool)), _this, SLOT(onFocusedDockAreaViewToggled(bool)));
+				updateDockAreaFocusStyle(FocusedArea, false);
+			}
+
+			FocusedArea = NewFocusedDockArea;
+			updateDockAreaFocusStyle(FocusedArea, true);
+			QObject::connect(FocusedArea, SIGNAL(viewToggled(bool)), _this, SLOT(onFocusedDockAreaViewToggled(bool)));
+		}
+
+
+
+		CFloatingDockContainer* NewFloatingWidget = nullptr;
+		DockContainer = FocusedDockWidget->dockContainer();
+		if (DockContainer)
+		{
+			NewFloatingWidget = DockContainer->floatingWidget();
+		}
+
+		if (NewFloatingWidget)
+		{
+			NewFloatingWidget->setProperty(FocusedDockWidgetProperty, QVariant::fromValue(QPointer<CDockWidget>(DockWidget)));
+		}
+
+
+		/*#ifdef Q_OS_LINUX*/
+			// This code is required for styling the floating widget titlebar for linux
+			// depending on the current focus state
+		if (FloatingWidget != NewFloatingWidget)
+		{
+			if (FloatingWidget)
+			{
+				updateFloatingWidgetFocusStyle(FloatingWidget, false);
+			}
+			FloatingWidget = NewFloatingWidget;
+
+			if (FloatingWidget)
+			{
+				updateFloatingWidgetFocusStyle(FloatingWidget, true);
+			}
+		}
+		/*#endif*/
+
+		if (old == DockWidget && !ForceFocusChangedSignal)
+		{
+			return;
+		}
+
+		ForceFocusChangedSignal = false;
+		if (DockWidget->isVisible())
+		{
+			Q_EMIT DockManager->focusedDockWidgetChanged(old, DockWidget);
+		}
+		else
+		{
+			OldFocusedDockWidget = old;
+			QObject::connect(DockWidget, SIGNAL(visibilityChanged(bool)), _this, SLOT(onDockWidgetVisibilityChanged(bool)));
 		}
 	}
-/*#endif*/
-
-    if (old == DockWidget && !ForceFocusChangedSignal)
-    {
-    	return;
-    }
-
-    ForceFocusChangedSignal = false;
-    if (DockWidget->isVisible())
-    {
-    	Q_EMIT DockManager->focusedDockWidgetChanged(old, DockWidget);
-    }
-    else
-    {
-    	OldFocusedDockWidget = old;
-    	QObject::connect(DockWidget, SIGNAL(visibilityChanged(bool)), _this, SLOT(onDockWidgetVisibilityChanged(bool)));
-    }
-}
 
 
 
-//============================================================================
-void CDockFocusController::onDockWidgetVisibilityChanged(bool Visible)
-{
-    auto Sender = sender();
-    auto DockWidget = qobject_cast<ads::CDockWidget*>(Sender);
-    disconnect(Sender, SIGNAL(visibilityChanged(bool)), this, SLOT(onDockWidgetVisibilityChanged(bool)));
-    if (DockWidget && Visible)
+	//============================================================================
+	void CDockFocusController::onDockWidgetVisibilityChanged(bool Visible)
 	{
-        Q_EMIT d->DockManager->focusedDockWidgetChanged(d->OldFocusedDockWidget, DockWidget);
+		auto Sender = sender();
+		auto DockWidget = qobject_cast<ads::CDockWidget*>(Sender);
+		disconnect(Sender, SIGNAL(visibilityChanged(bool)), this, SLOT(onDockWidgetVisibilityChanged(bool)));
+		if (DockWidget && Visible)
+		{
+			Q_EMIT d->DockManager->focusedDockWidgetChanged(d->OldFocusedDockWidget, DockWidget);
+		}
 	}
-}
 
 
-//============================================================================
-CDockFocusController::CDockFocusController(CDockManager* DockManager) :
-	Super(DockManager),
-	d(new DockFocusControllerPrivate(this))
-{
-	d->DockManager = DockManager;
-	connect(QApplication::instance(), SIGNAL(focusChanged(QWidget*, QWidget*)),
+	//============================================================================
+	CDockFocusController::CDockFocusController(CDockManager* DockManager) :
+		Super(DockManager),
+		d(new DockFocusControllerPrivate(this))
+	{
+		d->DockManager = DockManager;
+		connect(QApplication::instance(), SIGNAL(focusChanged(QWidget*, QWidget*)),
 			this, SLOT(onApplicationFocusChanged(QWidget*, QWidget*)));
-	connect(QApplication::instance(), SIGNAL(focusWindowChanged(QWindow*)),
+		connect(QApplication::instance(), SIGNAL(focusWindowChanged(QWindow*)),
 			this, SLOT(onFocusWindowChanged(QWindow*)));
-	connect(d->DockManager, SIGNAL(stateRestored()), SLOT(onStateRestored()));
-}
-
-//============================================================================
-CDockFocusController::~CDockFocusController()
-{
-	delete d;
-}
-
-
-//============================================================================
-void CDockFocusController::onFocusWindowChanged(QWindow *focusWindow)
-{
-	if (!focusWindow)
-	{
-		return;
+		connect(d->DockManager, SIGNAL(stateRestored()), SLOT(onStateRestored()));
 	}
 
-    auto vDockWidget = focusWindow->property(FocusedDockWidgetProperty);
-	if (!vDockWidget.isValid())
+	//============================================================================
+	CDockFocusController::~CDockFocusController()
 	{
-		return;
+		delete d;
 	}
 
-    auto DockWidget = vDockWidget.value<QPointer<CDockWidget>>();
-	if (!DockWidget)
+
+	//============================================================================
+	void CDockFocusController::onFocusWindowChanged(QWindow* focusWindow)
 	{
-		return;
-	}
+		if (!focusWindow)
+		{
+			return;
+		}
 
-	d->updateDockWidgetFocus(DockWidget);
-}
+		auto vDockWidget = focusWindow->property(FocusedDockWidgetProperty);
+		if (!vDockWidget.isValid())
+		{
+			return;
+		}
 
+		auto DockWidget = vDockWidget.value<QPointer<CDockWidget>>();
+		if (!DockWidget)
+		{
+			return;
+		}
 
-//===========================================================================
-void CDockFocusController::onApplicationFocusChanged(QWidget* focusedOld, QWidget* focusedNow)
-{
-    Q_UNUSED(focusedOld);
-
-	if (d->DockManager->isRestoringState())
-	{
-		return;
-	}
-
-    ADS_PRINT("CDockFocusController::onApplicationFocusChanged "
-    	<< " old: " << focusedOld << " new: " << focusedNow);
-	if (!focusedNow)
-	{
-		return;
-	}
-
-    CDockWidget* DockWidget = qobject_cast<CDockWidget*>(focusedNow);
-	if (!DockWidget)
-	{
-		DockWidget = internal::findParent<CDockWidget*>(focusedNow);
-	}
-
-#ifdef Q_OS_LINUX
-    if (!DockWidget)
-	{
-		return;
-	}
-#else
-    if (!DockWidget || DockWidget->tabWidget()->isHidden())
-	{
-    	return;
-	}
-#endif
-
-	d->updateDockWidgetFocus(DockWidget);
-}
-
-
-//===========================================================================
-void CDockFocusController::setDockWidgetTabFocused(CDockWidgetTab* Tab)
-{
-	auto DockWidget = Tab->dockWidget();
-	if (DockWidget)
-	{
 		d->updateDockWidgetFocus(DockWidget);
 	}
-}
 
 
-//===========================================================================
-void CDockFocusController::setDockWidgetFocused(CDockWidget* focusedNow)
-{
-	d->updateDockWidgetFocus(focusedNow);
-}
-
-
-//===========================================================================
-void CDockFocusController::onFocusedDockAreaViewToggled(bool Open)
-{
-	if (d->DockManager->isRestoringState())
+	//===========================================================================
+	void CDockFocusController::onApplicationFocusChanged(QWidget* focusedOld, QWidget* focusedNow)
 	{
-		return;
+		Q_UNUSED(focusedOld);
+
+		if (d->DockManager->isRestoringState())
+		{
+			return;
+		}
+
+		ADS_PRINT("CDockFocusController::onApplicationFocusChanged "
+			<< " old: " << focusedOld << " new: " << focusedNow);
+		if (!focusedNow)
+		{
+			return;
+		}
+
+		CDockWidget* DockWidget = qobject_cast<CDockWidget*>(focusedNow);
+		if (!DockWidget)
+		{
+			DockWidget = internal::findParent<CDockWidget*>(focusedNow);
+		}
+
+#ifdef Q_OS_LINUX
+		if (!DockWidget)
+		{
+			return;
+		}
+#else
+		if (!DockWidget || DockWidget->tabWidget()->isHidden())
+		{
+			return;
+		}
+#endif
+
+		d->updateDockWidgetFocus(DockWidget);
 	}
 
-	CDockAreaWidget* DockArea = qobject_cast<CDockAreaWidget*>(sender());
-	if (!DockArea || Open)
-	{
-		return;
-	}
-	auto Container = DockArea->dockContainer();
-	auto OpenedDockAreas = Container->openedDockAreas();
-	if (OpenedDockAreas.isEmpty())
-	{
-		return;
-	}
 
-	d->updateDockWidgetFocus(OpenedDockAreas[0]->currentDockWidget());
-}
-
-
-//===========================================================================
-void CDockFocusController::notifyWidgetOrAreaRelocation(QWidget* DroppedWidget)
-{
-	if (d->DockManager->isRestoringState())
+	//===========================================================================
+	void CDockFocusController::setDockWidgetTabFocused(CDockWidgetTab* Tab)
 	{
-		return;
+		auto DockWidget = Tab->dockWidget();
+		if (DockWidget)
+		{
+			d->updateDockWidgetFocus(DockWidget);
+		}
 	}
 
-	CDockWidget* DockWidget = qobject_cast<CDockWidget*>(DroppedWidget);
-    if (!DockWidget)
-    {
-        CDockAreaWidget* DockArea = qobject_cast<CDockAreaWidget*>(DroppedWidget);
-        if (DockArea)
-        {
-            DockWidget = DockArea->currentDockWidget();
-        }
-    }
 
-    if (!DockWidget)
-    {
-        return;
-    }
-
-    d->ForceFocusChangedSignal = true;
-    CDockManager::setWidgetFocus(DockWidget);
-}
-
-
-//===========================================================================
-void CDockFocusController::notifyFloatingWidgetDrop(CFloatingDockContainer* FloatingWidget)
-{
-	if (!FloatingWidget || d->DockManager->isRestoringState())
+	//===========================================================================
+	void CDockFocusController::setDockWidgetFocused(CDockWidget* focusedNow)
 	{
-		return;
+		d->updateDockWidgetFocus(focusedNow);
 	}
 
-    auto vDockWidget = FloatingWidget->property(FocusedDockWidgetProperty);
-	if (!vDockWidget.isValid())
+
+	//===========================================================================
+	void CDockFocusController::onFocusedDockAreaViewToggled(bool Open)
 	{
-		return;
+		if (d->DockManager->isRestoringState())
+		{
+			return;
+		}
+
+		CDockAreaWidget* DockArea = qobject_cast<CDockAreaWidget*>(sender());
+		if (!DockArea || Open)
+		{
+			return;
+		}
+		auto Container = DockArea->dockContainer();
+		auto OpenedDockAreas = Container->openedDockAreas();
+		if (OpenedDockAreas.isEmpty())
+		{
+			return;
+		}
+
+		d->updateDockWidgetFocus(OpenedDockAreas[0]->currentDockWidget());
 	}
 
-    auto DockWidget = vDockWidget.value<QPointer<CDockWidget>>();
-	if (DockWidget)
+
+	//===========================================================================
+	void CDockFocusController::notifyWidgetOrAreaRelocation(QWidget* DroppedWidget)
 	{
-		DockWidget->dockAreaWidget()->setCurrentDockWidget(DockWidget);
+		if (d->DockManager->isRestoringState())
+		{
+			return;
+		}
+
+		CDockWidget* DockWidget = qobject_cast<CDockWidget*>(DroppedWidget);
+		if (!DockWidget)
+		{
+			CDockAreaWidget* DockArea = qobject_cast<CDockAreaWidget*>(DroppedWidget);
+			if (DockArea)
+			{
+				DockWidget = DockArea->currentDockWidget();
+			}
+		}
+
+		if (!DockWidget)
+		{
+			return;
+		}
+
+		d->ForceFocusChangedSignal = true;
 		CDockManager::setWidgetFocus(DockWidget);
 	}
-}
 
 
-//==========================================================================
-void CDockFocusController::onStateRestored()
-{
-	if (d->FocusedDockWidget)
+	//===========================================================================
+	void CDockFocusController::notifyFloatingWidgetDrop(CFloatingDockContainer* FloatingWidget)
 	{
-		updateDockWidgetFocusStyle(d->FocusedDockWidget, false);
+		if (!FloatingWidget || d->DockManager->isRestoringState())
+		{
+			return;
+		}
+
+		auto vDockWidget = FloatingWidget->property(FocusedDockWidgetProperty);
+		if (!vDockWidget.isValid())
+		{
+			return;
+		}
+
+		auto DockWidget = vDockWidget.value<QPointer<CDockWidget>>();
+		if (DockWidget)
+		{
+			DockWidget->dockAreaWidget()->setCurrentDockWidget(DockWidget);
+			CDockManager::setWidgetFocus(DockWidget);
+		}
 	}
-}
 
 
-//==========================================================================
-CDockWidget* CDockFocusController::focusedDockWidget() const
-{
-	return d->FocusedDockWidget.data();
-}
+	//==========================================================================
+	void CDockFocusController::onStateRestored()
+	{
+		if (d->FocusedDockWidget)
+		{
+			updateDockWidgetFocusStyle(d->FocusedDockWidget, false);
+		}
+	}
+
+
+	//==========================================================================
+	CDockWidget* CDockFocusController::focusedDockWidget() const
+	{
+		return d->FocusedDockWidget.data();
+	}
 
 } // namespace ads
 
