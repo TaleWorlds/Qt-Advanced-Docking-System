@@ -236,6 +236,8 @@ namespace ads
 		 */
 		CDockContainerWidget* dockContainer() const;
 
+		CDockManager* dockManager() const;
+
 		/**
 		 * Clones the widget elsewhere and deletes this widget
 		 */

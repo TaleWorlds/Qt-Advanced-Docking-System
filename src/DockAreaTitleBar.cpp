@@ -67,6 +67,7 @@ namespace ads
 		QPointer<tTitleBarButton> TabsMenuButton;
 		QPointer<tTitleBarButton> UndockButton;
 		QPointer<tTitleBarButton> CloseButton;
+		QPointer<QToolButton> AddButton;
 		QBoxLayout* Layout;
 		CDockAreaWidget* DockArea;
 		CDockAreaTabBar* TabBar;
@@ -144,6 +145,25 @@ namespace ads
 	{
 		QSizePolicy ButtonSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
 
+		// Add button
+		AddButton = new CTitleBarButton(true);
+		AddButton->setObjectName("dockAreaAddButton");
+		AddButton->setSizePolicy(ButtonSizePolicy);
+		AddButton->setIconSize({ 15, 15 });
+		internal::setToolTip(AddButton, QObject::tr("New Tab"));
+
+		// Widget for button
+		QWidget* AddButtonWidget = new QWidget(_this);
+		QBoxLayout* AddButtonLayout = new QBoxLayout(QBoxLayout::LeftToRight, AddButtonWidget);
+		AddButtonLayout->setContentsMargins(2, 3, 2, 3);
+		AddButtonLayout->addWidget(AddButton);
+		AddButtonWidget->setLayout(AddButtonLayout);
+		Layout->addWidget(AddButtonWidget, 0);
+		QObject::connect(AddButton, &QToolButton::clicked, _this, &CDockAreaTitleBar::onAddButtonClicked);
+
+		// Spacer
+		Layout->addWidget(new CSpacerWidget(_this));
+
 		// Tabs menu button
 		TabsMenuButton = new CTitleBarButton(testConfigFlag(CDockManager::DockAreaHasTabsMenuButton));
 		TabsMenuButton->setObjectName("tabsMenuButton");
@@ -186,7 +206,7 @@ namespace ads
 			internal::setToolTip(CloseButton, QObject::tr("Close Group"));
 		}
 		CloseButton->setSizePolicy(ButtonSizePolicy);
-		CloseButton->setIconSize(QSize(16, 16));
+		CloseButton->setIconSize(QSize(20, 20));
 		Layout->addWidget(CloseButton, 0);
 		_this->connect(CloseButton, SIGNAL(clicked()), SLOT(onCloseButtonClicked()));
 	}
@@ -268,7 +288,6 @@ namespace ads
 		setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
 
 		d->createTabBar();
-		d->Layout->addWidget(new CSpacerWidget(this));
 		d->createButtons();
 
 		setFocusPolicy(Qt::NoFocus);
@@ -441,6 +460,11 @@ namespace ads
 	}
 
 
+	void CDockAreaTitleBar::onAddButtonClicked(bool checked /*= false*/)
+	{
+		emit d->dockManager()->addButtonClicked(d->DockArea);
+	}
+
 	//============================================================================
 	QAbstractButton* CDockAreaTitleBar::button(TitleBarButton which) const
 	{
@@ -449,6 +473,7 @@ namespace ads
 		case TitleBarButtonTabsMenu: return d->TabsMenuButton;
 		case TitleBarButtonUndock: return d->UndockButton;
 		case TitleBarButtonClose: return d->CloseButton;
+		case TitleBarButtonAdd: return d->AddButton;
 		default:
 			return nullptr;
 		}
@@ -662,7 +687,7 @@ namespace ads
 	CSpacerWidget::CSpacerWidget(QWidget* Parent /*= 0*/) : Super(Parent)
 	{
 		setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-		setStyleSheet("border: none; background: none;");
+		//setStyleSheet("border: none; background: none;");
 	}
 
 } // namespace ads

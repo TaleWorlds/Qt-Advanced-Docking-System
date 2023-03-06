@@ -211,7 +211,7 @@ namespace ads
 			MiddleMouseButtonClosesTab = 0x2000000, //! If the flag is set, the user can use the mouse middle button to close the tab under the mouse
 			DoubleClickDoesNotFloatTab = 0x8000000,		//! If the flag is set, the user will not be able to float a tab by double clicking on it
 			DockWidgetTabElidingEnabled = 0x10000000,
-			FloatingShadowEnabled = 0x20000000, // Shadow for floating dock container
+			FloatingShadowEnabled = 0x20000000, //!Shadow for floating dock container
 			DefaultDockAreaButtons = DockAreaHasCloseButton
 			| DockAreaHasUndockButton
 			| DockAreaHasTabsMenuButton,///< default configuration of dock area title bar buttons
@@ -645,6 +645,15 @@ namespace ads
 		 * The focused dock widget is the one that is highlighted in the GUI
 		 */
 		void focusedDockWidgetChanged(ads::CDockWidget* old, ads::CDockWidget* now);
+
+		/**
+		 * This signal is emitted when the add button is clicked on a dock area.
+		 * The add button is available with CDockManager::DockAreaHasAddButton.
+		 * You can connect to this signal to open a dialog in the app
+		 * , or directly add a specific widget to the dock area given in the parameter
+		 */
+		void addButtonClicked(ads::CDockAreaWidget* SenderDockArea);
+
 	}; // class DockManager
 } // namespace ads
 

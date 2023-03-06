@@ -50,7 +50,7 @@ namespace ads
 	class ADS_EXPORT CDockAreaTitleBar : public QFrame
 	{
 		Q_PROPERTY(bool focused READ isFocused)
-		Q_OBJECT
+			Q_OBJECT
 	private:
 		DockAreaTitleBarPrivate* d; ///< private data (pimpl)
 		friend struct DockAreaTitleBarPrivate;
@@ -61,6 +61,7 @@ namespace ads
 		void onUndockButtonClicked();
 		void onTabsMenuActionTriggered(QAction* Action);
 		void onCurrentTabChanged(int Index);
+		void onAddButtonClicked(bool checked = false);
 
 	protected:
 		/**

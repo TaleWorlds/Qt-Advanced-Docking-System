@@ -157,6 +157,10 @@ namespace ads
             NoTab = 0x080, ///< dock widget tab will never be shown if this flag is set
             DeleteContentOnClose = 0x100, ///< deletes only the contained widget on close, keeping the dock widget intact and in place. Attempts to rebuild the contents widget on show if there is a widget factory set.
             DockWidgetIndependent = 0x200, ///< This dock widget will have no parent when it is floated, causing the system window manager to display is as an independent window
+            DockWidgetHasAddButton = 0x400, ///!<Add button next to the dock area of this dock widget, which fires a 
+            //!<signal to dock manager along with the dock area it belongs to. The users can then programatically control this 
+            //!<signal with a slot; to open a dialog or add a dock widget etc. If the signal is 
+            //!<not connected, the button wont do anything
             DefaultDockWidgetFeatures = DockWidgetClosable | DockWidgetMovable | DockWidgetFloatable | DockWidgetFocusable,
             AllDockWidgetFeatures = DefaultDockWidgetFeatures | DockWidgetDeleteOnClose | CustomCloseHandling | DockWidgetIndependent,
             DockWidgetAlwaysCloseAndDelete = DockWidgetForceCloseWithArea | DockWidgetDeleteOnClose,

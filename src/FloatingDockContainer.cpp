@@ -758,9 +758,9 @@ namespace ads
 			{
 				d->StatusBar = new QStatusBar(d->DockContainer);
 				d->StatusBar->setObjectName("floatingWidgetStatusBar");
-				d->StatusBar->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);
+				d->StatusBar->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
 				d->StatusBar->setContentsMargins(0, 0, 0, 0);
-				d->StatusBar->setFixedHeight(10);
+				d->StatusBar->setFixedHeight(15);
 				d->DockContainer->layout()->addWidget(d->StatusBar);
 			}
 			d->TitleBar = new CFloatingWidgetTitleBar(this);
@@ -816,6 +816,11 @@ namespace ads
 	CDockContainerWidget* CFloatingDockContainer::dockContainer() const
 	{
 		return d->DockContainer;
+	}
+
+	ads::CDockManager* CFloatingDockContainer::dockManager() const
+	{
+		return d->DockManager;
 	}
 
 	CFloatingDockContainer* CFloatingDockContainer::moveContainerAndDelete()
@@ -1528,7 +1533,6 @@ namespace ads
 				else {
 					QWidget* action = QApplication::widgetAt(internal::globalPositionOf(event));
 					if (action) {
-						bool inTitlebar = false;
 						if (action == d->TitleBar) {
 							d->LeftMBPressed = true;
 							d->DragStartPosition = mapToParent(mapFromGlobal(internal::globalPositionOf(event))) - frameGeometry().topLeft()

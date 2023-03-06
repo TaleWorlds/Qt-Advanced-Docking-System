@@ -173,9 +173,9 @@ namespace ads
 			auto LayoutItem = m_ParentLayout->takeAt(1);
 			if (LayoutItem)
 			{
-				LayoutItem->widget()->setParent(nullptr);
+				//LayoutItem->widget()->setParent(nullptr);
 			}
-			delete LayoutItem;
+			//delete LayoutItem;
 
 			m_ParentLayout->addWidget(next);
 			if (prev)
@@ -354,11 +354,22 @@ namespace ads
 			UpdateTitleBarButtons = true;
 			return;
 		}
+		bool has_add = false;
+		for (int i = 0; i < _this->dockWidgetsCount(); i++)
+		{
+			auto DW = dockWidgetAt(i);
+			if (DW && DW->features().testFlag(CDockWidget::DockWidgetHasAddButton))
+			{
+				has_add = true;
+				break;
+			}
+		}
 
 		TitleBar->button(TitleBarButtonClose)->setEnabled(
 			_this->features().testFlag(CDockWidget::DockWidgetClosable));
 		TitleBar->button(TitleBarButtonUndock)->setEnabled(
 			_this->features().testFlag(CDockWidget::DockWidgetFloatable));
+		TitleBar->button(TitleBarButtonAdd)->setVisible(has_add);
 		TitleBar->updateDockWidgetActionsButtons();
 		UpdateTitleBarButtons = false;
 	}
@@ -381,7 +392,7 @@ namespace ads
 		{
 			Q_EMIT d->DockManager->dockAreaCreated(this);
 		}
-		setSizePolicy(QSizePolicy::Policy::Minimum, QSizePolicy::Policy::Minimum);
+		setSizePolicy(QSizePolicy::Policy::Preferred, QSizePolicy::Policy::Preferred);
 	}
 
 	//============================================================================
@@ -763,6 +774,12 @@ namespace ads
 			bool Hidden = Container->hasTopLevelDockWidget() && (Container->isFloating()
 				|| CDockManager::testConfigFlag(CDockManager::HideSingleCentralWidgetTitleBar));
 			Hidden |= (d->Flags.testFlag(HideSingleWidgetTitleBar) && openDockWidgetsCount() == 1);
+			auto DW = openedDockWidgets().isEmpty() ? nullptr : openedDockWidgets().at(0);
+			// Always show the title bar if the single opened dock widget has add button functionality
+			if (openDockWidgetsCount() == 1 && DW && DW->features().testFlag(CDockWidget::DockWidgetHasAddButton))
+			{
+				Hidden = false;
+			}
 			d->TitleBar->setVisible(!Hidden);
 		}
 	}
