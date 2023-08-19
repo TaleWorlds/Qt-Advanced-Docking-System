@@ -523,7 +523,7 @@ namespace ads
 				_this->setGeometry(
 					QRect(TopLeft,
 						QSize(Rect.width(), Rect.height() - TitleBarHeight)));
-				QApplication::processEvents();
+				// QApplication::processEvents();
 			}
 			DropContainer->dropFloatingWidget(_this, QCursor::pos());
 			DropContainer->fetchIndependentCount();

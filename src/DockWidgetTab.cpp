@@ -171,9 +171,9 @@ namespace ads
 			{
 				auto w = new CFloatingDragPreview(Widget);
 				_this->connect(w, &CFloatingDragPreview::draggingCanceled, [=]()
-				{
-					DragState = DraggingInactive;
-				});
+					{
+						DragState = DraggingInactive;
+					});
 				return w;
 			}
 		}
@@ -264,7 +264,7 @@ namespace ads
 		Layout->setSpacing(0);
 		_this->setLayout(Layout);
 		Layout->addWidget(TitleLabel, 1);
-		Layout->addSpacing(Spacing);
+		Layout->addSpacing(2 * Spacing);
 		Layout->addWidget(CloseButton);
 		Layout->addSpacing(qRound(Spacing * 4.0 / 3.0));
 		Layout->setAlignment(Qt::AlignCenter);

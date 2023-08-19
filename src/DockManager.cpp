@@ -472,9 +472,9 @@ namespace ads
 			auto Actions = Menu->actions();
 			auto it = std::find_if(Actions.begin(), Actions.end(),
 				[&Action](const QAction* a)
-			{
-				return a->text().compare(Action->text(), Qt::CaseInsensitive) > 0;
-			});
+				{
+					return a->text().compare(Action->text(), Qt::CaseInsensitive) > 0;
+				});
 
 			if (it == Actions.end())
 			{
@@ -508,7 +508,6 @@ namespace ads
 		d->DockAreaOverlay = new CDockOverlay(this, CDockOverlay::ModeDockAreaOverlay);
 		d->ContainerOverlay = new CDockOverlay(this, CDockOverlay::ModeContainerOverlay);
 		d->Containers.append(this);
-		d->loadStylesheet();
 
 		if (CDockManager::testConfigFlag(CDockManager::FocusHighlighting))
 		{
@@ -519,14 +518,14 @@ namespace ads
 		window()->installEventFilter(this);
 
 		connect(qApp, &QApplication::focusWindowChanged, [](QWindow* focusWindow)
-		{
-			// bring modal dialogs to foreground to ensure that they are in front of any
-			// floating dock widget
-			if (focusWindow && focusWindow->isModal())
 			{
-				focusWindow->raise();
-			}
-		});
+				// bring modal dialogs to foreground to ensure that they are in front of any
+				// floating dock widget
+				if (focusWindow && focusWindow->isModal())
+				{
+					focusWindow->raise();
+				}
+			});
 		/*#endif*/
 	}
 

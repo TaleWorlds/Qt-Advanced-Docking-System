@@ -341,7 +341,10 @@ namespace ads
 		}
 
 		d->Widget = widget;
-		d->Widget->setProperty("dockWidgetContent", true);
+		if (d->Widget)
+		{
+			d->Widget->setProperty("dockWidgetContent", true);
+		}
 	}
 
 	//============================================================================

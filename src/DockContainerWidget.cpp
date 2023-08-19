@@ -1286,8 +1286,11 @@ namespace ads
 			updateSplitterHandles(TargetAreaSplitter);
 			if (CDockManager::testConfigFlag(CDockManager::EqualSplitOnInsertion))
 			{
+				//QApplication::processEvents();
 				TargetAreaSplitter->setSizes(TargetAreaSizes);
+				// QApplication::processEvents();
 				adjustSplitterSizesOnInsertion(NewSplitter);
+				// QApplication::processEvents();
 			}
 		}
 

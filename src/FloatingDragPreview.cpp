@@ -225,7 +225,7 @@ namespace ads
 			FloatingWidget->show();
 			if (!CDockManager::testConfigFlag(CDockManager::DragPreviewHasWindowFrame))
 			{
-				QApplication::processEvents();
+				// QApplication::processEvents();
 				int FrameHeight = FloatingWidget->frameGeometry().height() - FloatingWidget->geometry().height();
 				QRect FixedGeometry = geo;
 				FixedGeometry.adjust(0, FrameHeight, 0, 0);
@@ -378,6 +378,7 @@ namespace ads
 		}
 		if (SourceContainer) SourceContainer->fetchIndependentCount();
 		if (d->DropContainer) d->DropContainer->fetchIndependentCount();
+		auto dockManager_ = d->DockManager;
 		// Case - Existing Floating Drop Container is just changed
 		auto SourceFloatingContainer = SourceContainer ? SourceContainer->floatingWidget() : nullptr;
 		auto DropFloatingContainer = d->DropContainer ? d->DropContainer->floatingWidget() : nullptr;
@@ -395,6 +396,7 @@ namespace ads
 				CFloatingDockContainer* RestoredFloatingWidget = DropFloatingContainer->moveContainerAndDelete();
 			}
 		}
+		bool deleted = false;
 		// Case - Source Container was Also Changed
 		if (SourceContainer
 			&& SourceContainer->isFloating()
@@ -404,17 +406,25 @@ namespace ads
 			bool source_has_independent = SourceContainer ? SourceContainer->hasIndependentWidget() : false;
 			if (source_has_independent != source_had_independent)
 			{
+				if (SourceFloatingContainer->dockContainer() == SourceContainer)
+				{
+					deleted = true;
+				}
 				CFloatingDockContainer* RestoredFloatingWidget = SourceFloatingContainer->moveContainerAndDelete();
+				RestoredFloatingWidget->setUpdatesEnabled(true);
 				containerOverlay = nullptr;
 				dockAreaOverlay = nullptr;
-				d->ContentSourceArea = nullptr;
+				if (!deleted)
+				{
+					d->ContentSourceArea = nullptr;
+				}
 			}
 		}
-		this->close();
+		close();
 		if (containerOverlay) containerOverlay->hideOverlay();
 		if (dockAreaOverlay) dockAreaOverlay->hideOverlay();
-		d->DockManager->containerOverlay()->hideOverlay();
-		d->DockManager->dockAreaOverlay()->hideOverlay();
+		if (dockManager_) dockManager_->containerOverlay()->hideOverlay();
+		if (dockManager_) dockManager_->dockAreaOverlay()->hideOverlay();
 	}
 
 

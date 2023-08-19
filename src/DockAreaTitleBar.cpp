@@ -246,9 +246,9 @@ namespace ads
 		{
 			auto w = new CFloatingDragPreview(DockArea);
 			QObject::connect(w, &CFloatingDragPreview::draggingCanceled, [=]()
-			{
-				this->DragState = DraggingInactive;
-			});
+				{
+					this->DragState = DraggingInactive;
+				});
 			FloatingWidget = w;
 		}
 
