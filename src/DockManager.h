@@ -462,14 +462,22 @@ namespace ads
 		 */
 		QAction* addToggleViewActionToMenu(QAction* ToggleViewAction,
 			const QString& Group = QString(), const QIcon& GroupIcon = QIcon());
-
+		
+		void removeToggleViewActionFromMenu(QAction* ToggleViewAction, const QString& Group = QString());
+		
 		/**
 		 * This function returns the internal view menu.
 		 * To fill the view menu, you can use the addToggleViewActionToMenu()
 		 * function.
 		 */
 		QMenu* viewMenu() const;
-
+	
+		/**
+		 * This function clears internal view menu, also deleting the
+		 * submenus created inside it.
+		 */
+		void clearViewMenu();
+		
 		/**
 		 * Define the insertion order for toggle view menu items.
 		 * The order defines how the actions are added to the view menu.
