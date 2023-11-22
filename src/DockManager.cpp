@@ -1098,7 +1098,42 @@ namespace ads
 			return ToggleViewAction;
 		}
 	}
-
+	
+	//============================================================================
+	void CDockManager::removeToggleViewActionFromMenu(QAction* ToggleViewAction, const QString& Group /*= QString()*/)
+	{
+		bool AlphabeticallySorted = (MenuAlphabeticallySorted == d->MenuInsertionOrder);
+		if (!Group.isEmpty())
+		{
+			QMenu* GroupMenu = d->ViewMenuGroups.value(Group, 0);
+			if (GroupMenu)
+			{
+				if (GroupMenu->actions().indexOf(ToggleViewAction) >= 0)
+				{
+					GroupMenu->removeAction(ToggleViewAction);
+				}
+				else
+				{
+					qDebug("The action does not exist in this group");
+				}
+			}
+			else
+			{
+				qDebug("The group specified does not exist in the view menu");
+			}
+		}
+		else
+		{
+			if (d->ViewMenu->actions().indexOf(ToggleViewAction) >= 0)
+			{
+				d->ViewMenu->removeAction(ToggleViewAction);
+			}
+			else
+			{
+				qDebug("The action does not exist in this group");
+			}
+		}
+	}
 
 	//============================================================================
 	QMenu* CDockManager::viewMenu() const
@@ -1106,6 +1141,16 @@ namespace ads
 		return d->ViewMenu;
 	}
 
+	//============================================================================
+	void CDockManager::clearViewMenu()
+	{
+		for (auto Group : d->ViewMenuGroups)
+		{
+			Group->deleteLater();
+		}
+		d->ViewMenuGroups.clear();
+		d->ViewMenu->clear();
+	}
 
 	//============================================================================
 	void CDockManager::setViewMenuInsertionOrder(eViewMenuInsertionOrder Order)
