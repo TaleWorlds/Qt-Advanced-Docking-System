@@ -155,7 +155,7 @@ namespace ads
 		// Widget for button
 		QWidget* AddButtonWidget = new QWidget(_this);
 		QBoxLayout* AddButtonLayout = new QBoxLayout(QBoxLayout::LeftToRight, AddButtonWidget);
-		AddButtonLayout->setContentsMargins(2, 3, 2, 3);
+		AddButtonLayout->setContentsMargins(0, 0, 0, 0);
 		AddButtonLayout->addWidget(AddButton);
 		AddButtonWidget->setLayout(AddButtonLayout);
 		Layout->addWidget(AddButtonWidget, 0);

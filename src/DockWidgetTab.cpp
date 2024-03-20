@@ -264,7 +264,7 @@ namespace ads
 		Layout->setSpacing(0);
 		_this->setLayout(Layout);
 		Layout->addWidget(TitleLabel, 1);
-		Layout->addSpacing(2 * Spacing);
+		Layout->addSpacing(Spacing);
 		Layout->addWidget(CloseButton);
 		Layout->addSpacing(qRound(Spacing * 4.0 / 3.0));
 		Layout->setAlignment(Qt::AlignCenter);
