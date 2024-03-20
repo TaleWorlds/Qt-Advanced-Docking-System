@@ -30,10 +30,10 @@
 //============================================================================
 //                                   INCLUDES
 //============================================================================
-#include "ads_globals.h"
 #include "DockContainerWidget.h"
 #include "DockWidget.h"
 #include "FloatingDockContainer.h"
+#include "ads_globals.h"
 
 
 QT_FORWARD_DECLARE_CLASS(QSettings)
@@ -84,8 +84,6 @@ namespace ads
 		friend class CFloatingDragPreview;
 		friend struct FloatingDragPreviewPrivate;
 		friend class CDockAreaTitleBar;
-
-
 	protected:
 		/**
 		 * Registers the given floating widget in the internal list of
@@ -151,7 +149,6 @@ namespace ads
 		 * Restore floating widgets hidden by an earlier call to hideManagerAndFloatingWidgets.
 		 */
 		void restoreHiddenFloatingWidgets();
-
 	public:
 		using Super = CDockContainerWidget;
 
@@ -168,68 +165,91 @@ namespace ads
 		 */
 		enum eConfigFlag
 		{
-			ActiveTabHasCloseButton = 0x0001,    //!< If this flag is set, the active tab in a tab area has a close button
-			DockAreaHasCloseButton = 0x0002,     //!< If the flag is set each dock area has a close button
-			DockAreaCloseButtonClosesTab = 0x0004,//!< If the flag is set, the dock area close button closes the active tab, if not set, it closes the complete dock area
-			OpaqueSplitterResize = 0x0008, //!< See QSplitter::setOpaqueResize() documentation
-			XmlAutoFormattingEnabled = 0x0010,//!< If enabled, the XML writer automatically adds line-breaks and indentation to empty sections between elements (ignorable whitespace).
-			XmlCompressionEnabled = 0x0020,//!< If enabled, the XML output will be compressed and is not human readable anymore
-			TabCloseButtonIsToolButton = 0x0040,//! If enabled the tab close buttons will be QToolButtons instead of QPushButtons - disabled by default
+			ActiveTabHasCloseButton = 0x0001,	   //!< If this flag is set, the active tab in a tab area has a close button
+			DockAreaHasCloseButton = 0x0002,	   //!< If the flag is set each dock area has a close button
+			DockAreaCloseButtonClosesTab = 0x0004, //!< If the flag is set, the dock area close button closes the active tab, if not
+			//!< set, it closes the complete dock area
+			OpaqueSplitterResize = 0x0008,		   //!< See QSplitter::setOpaqueResize() documentation
+			XmlAutoFormattingEnabled = 0x0010,	   //!< If enabled, the XML writer automatically adds line-breaks and indentation to
+			//!< empty sections between elements (ignorable whitespace).
+			XmlCompressionEnabled = 0x0020, //!< If enabled, the XML output will be compressed and is not human readable anymore
+			TabCloseButtonIsToolButton =
+			0x0040, //! If enabled the tab close buttons will be QToolButtons instead of QPushButtons - disabled by default
 			AllTabsHaveCloseButton = 0x0080, //!< if this flag is set, then all tabs that are closable show a close button
-			RetainTabSizeWhenCloseButtonHidden = 0x0100, //!< if this flag is set, the space for the close button is reserved even if the close button is not visible
-			OpaqueUndocking = 0x0200,///< If enabled, the widgets are immediately undocked into floating widgets, if disabled, only a draw preview is undocked and the real undocking is deferred until the mouse is released
-			DragPreviewIsDynamic = 0x0400,///< If opaque undocking is disabled, this flag defines the behavior of the drag preview window, if this flag is enabled, the preview will be adjusted dynamically to the drop area
-			DragPreviewShowsContentPixmap = 0x0800,///< If opaque undocking is disabled, the created drag preview window shows a copy of the content of the dock widget / dock are that is dragged
-			DragPreviewHasWindowFrame = 0x1000,///< If opaque undocking is disabled, then this flag configures if the drag preview is frameless or looks like a real window
-			AlwaysShowTabs = 0x2000,///< If this option is enabled, the tab of a dock widget is always displayed - even if it is the only visible dock widget in a floating widget.
-			DockAreaHasUndockButton = 0x4000,     //!< If the flag is set each dock area has an undock button
-			DockAreaHasTabsMenuButton = 0x8000,     //!< If the flag is set each dock area has a tabs menu button
-			DockAreaHideDisabledButtons = 0x10000,    //!< If the flag is set disabled dock area buttons will not appear on the toolbar at all (enabling them will bring them back)
-			DockAreaDynamicTabsMenuButtonVisibility = 0x20000, //!< If the flag is set, the tabs menu button will be shown only when it is required - that means, if the tabs are elided. If the tabs are not elided, it is hidden
-			FloatingContainerHasWidgetTitle = 0x40000, //!< If set, the Floating Widget window title reflects the title of the current dock widget otherwise it displays application name as window title
-			FloatingContainerHasWidgetIcon = 0x80000, //!< If set, the Floating Widget icon reflects the icon of the current dock widget otherwise it displays application icon
-			HideSingleCentralWidgetTitleBar = 0x100000, //!< If there is only one single visible dock widget in the main dock container (the dock manager) and if this flag is set, then the titlebar of this dock widget will be hidden
-			//!< this only makes sense for non draggable and non floatable widgets and enables the creation of some kind of "central" widget
+			RetainTabSizeWhenCloseButtonHidden =
+			0x0100, //!< if this flag is set, the space for the close button is reserved even if the close button is not visible
+			OpaqueUndocking = 0x0200, ///< If enabled, the widgets are immediately undocked into floating widgets, if disabled, only
+			///< a draw preview is undocked and the real undocking is deferred until the mouse is released
+			DragPreviewIsDynamic =
+			0x0400, ///< If opaque undocking is disabled, this flag defines the behavior of the drag preview window, if this
+			///< flag is enabled, the preview will be adjusted dynamically to the drop area
+			DragPreviewShowsContentPixmap = 0x0800, ///< If opaque undocking is disabled, the created drag preview window shows a
+			///< copy of the content of the dock widget / dock are that is dragged
+			DragPreviewHasWindowFrame = 0x1000, ///< If opaque undocking is disabled, then this flag configures if the drag preview
+			///< is frameless or looks like a real window
+			AlwaysShowTabs = 0x2000, ///< If this option is enabled, the tab of a dock widget is always displayed - even if it is
+			///< the only visible dock widget in a floating widget.
+			DockAreaHasUndockButton = 0x4000,	   //!< If the flag is set each dock area has an undock button
+			DockAreaHasTabsMenuButton = 0x8000,	   //!< If the flag is set each dock area has a tabs menu button
+			DockAreaHideDisabledButtons = 0x10000, //!< If the flag is set disabled dock area buttons will not appear on the toolbar
+			//!< at all (enabling them will bring them back)
+			DockAreaDynamicTabsMenuButtonVisibility =
+			0x20000, //!< If the flag is set, the tabs menu button will be shown only when it is required - that means, if the
+			//!< tabs are elided. If the tabs are not elided, it is hidden
+			FloatingContainerHasWidgetTitle =
+			0x40000, //!< If set, the Floating Widget window title reflects the title of the current dock widget otherwise it
+			//!< displays application name as window title
+			FloatingContainerHasWidgetIcon = 0x80000, //!< If set, the Floating Widget icon reflects the icon of the current dock
+			//!< widget otherwise it displays application icon
+			HideSingleCentralWidgetTitleBar =
+			0x100000, //!< If there is only one single visible dock widget in the main dock container (the dock manager) and if
+			//!< this flag is set, then the titlebar of this dock widget will be hidden this only makes sense for non
+			//!< draggable and non floatable widgets and enables the creation of some kind of "central" widget
 
-			FocusHighlighting = 0x200000, //!< enables styling of focused dock widget tabs or floating widget titlebar
+			FocusHighlighting = 0x200000,	  //!< enables styling of focused dock widget tabs or floating widget titlebar
 			EqualSplitOnInsertion = 0x400000, ///!< if enabled, the space is equally distributed to all widgets in a  splitter
 
-			FloatingContainerForceNativeTitleBar = 0x800000, //!< Forces all FloatingContainer to use the native title bar. This might break docking for FloatinContainer on some Window Managers (like Kwin/KDE).
-			//!< If neither this nor FloatingContainerForceCustomTitleBar is set (the default) native titlebars are used except on known bad systems.
+			FloatingContainerForceNativeTitleBar =
+			0x800000, //!< Forces all FloatingContainer to use the native title bar. This might break docking for
+			//!< FloatinContainer on some Window Managers (like Kwin/KDE). If neither this nor
+			//!< FloatingContainerForceCustomTitleBar is set (the default) native titlebars are used except on known
+			//!< bad systems.
 			//! Users can overwrite this by setting the environment variable ADS_UseNativeTitle to "1" or "0".
 
-			FloatingContainerForceQWidgetTitleBar = 0x4000000, //!< Forces all FloatingContainer to use a QWidget based title bar.
+			FloatingContainerForceQWidgetTitleBar =
+			0x4000000, //!< Forces all FloatingContainer to use a QWidget based title bar.
 			//!< If neither this nor FloatingContainerForceNativeTitleBar is set (the default) native titlebars
 			//!< are used except on known bad systems.
 			//! Users can overwrite this by setting the environment variable ADS_UseNativeTitle to "1" or "0".
 
-			FloatingContainerForceQWidgetCustomStyledTitleBar = 0x1000000, //!< This flag does the same functionality as FloatingContainerForceQWidgetTitleBar, and it
-			//!<allows the users to set their own styling if they are using QWidgetTitleBar using Stylesheets. If this
-			//!<flag is set, but the styling was not provided, Icons and buttons might not be seen. Currently, 
+			FloatingContainerForceQWidgetCustomStyledTitleBar =
+			0x1000000, //!< This flag does the same functionality as FloatingContainerForceQWidgetTitleBar, and it
+			//!< allows the users to set their own styling if they are using QWidgetTitleBar using Stylesheets. If
+			//!< this flag is set, but the styling was not provided, Icons and buttons might not be seen. Currently,
 			// qroperty-maximizeIcon: ..; syntax does not seem to work
 
-			MiddleMouseButtonClosesTab = 0x2000000, //! If the flag is set, the user can use the mouse middle button to close the tab under the mouse
-			DoubleClickDoesNotFloatTab = 0x8000000,		//! If the flag is set, the user will not be able to float a tab by double clicking on it
+			MiddleMouseButtonClosesTab =
+			0x2000000, //! If the flag is set, the user can use the mouse middle button to close the tab under the mouse
+			DoubleClickDoesNotFloatTab =
+			0x8000000, //! If the flag is set, the user will not be able to float a tab by double clicking on it
 			DockWidgetTabElidingEnabled = 0x10000000,
-			FloatingShadowEnabled = 0x20000000, //!Shadow for floating dock container
-			DefaultDockAreaButtons = DockAreaHasCloseButton
-			| DockAreaHasUndockButton
-			| DockAreaHasTabsMenuButton,///< default configuration of dock area title bar buttons
+			FloatingShadowEnabled = 0x20000000, //! Shadow for floating dock container
+			DefaultDockAreaButtons = DockAreaHasCloseButton | DockAreaHasUndockButton
+			| DockAreaHasTabsMenuButton, ///< default configuration of dock area title bar buttons
 
-			DefaultBaseConfig = DefaultDockAreaButtons
-			| ActiveTabHasCloseButton
-			| XmlCompressionEnabled
-			| FloatingContainerHasWidgetTitle,///< default base configuration settings
+			DefaultBaseConfig = DefaultDockAreaButtons | ActiveTabHasCloseButton | XmlCompressionEnabled
+			| FloatingContainerHasWidgetTitle, ///< default base configuration settings
 
-			DefaultOpaqueConfig = DefaultBaseConfig
-			| OpaqueSplitterResize
-			| OpaqueUndocking, ///< the default configuration with opaque operations - this may cause issues if ActiveX or Qt 3D windows are involved
+			DefaultOpaqueConfig = DefaultBaseConfig | OpaqueSplitterResize
+			| OpaqueUndocking, ///< the default configuration with opaque operations - this may cause issues
+			///< if ActiveX or Qt 3D windows are involved
 
-			DefaultNonOpaqueConfig = DefaultBaseConfig
-			| DragPreviewShowsContentPixmap, ///< the default configuration for non opaque operations
+			DefaultNonOpaqueConfig =
+			DefaultBaseConfig | DragPreviewShowsContentPixmap, ///< the default configuration for non opaque operations
 
-			NonOpaqueWithWindowFrame = DefaultNonOpaqueConfig
-			| DragPreviewHasWindowFrame ///< the default configuration for non opaque operations that show a real window with frame
+			NonOpaqueWithWindowFrame =
+			DefaultNonOpaqueConfig | DragPreviewHasWindowFrame ///< the default configuration for non opaque operations that
+			///< show a real window with frame
 		};
 		Q_DECLARE_FLAGS(ConfigFlags, eConfigFlag)
 
@@ -290,8 +310,7 @@ namespace ads
 		 * \endcode
 		 * \return Returns the dock area widget that contains the new DockWidget
 		 */
-		CDockAreaWidget* addDockWidget(DockWidgetArea area, CDockWidget* Dockwidget,
-			CDockAreaWidget* DockAreaWidget = nullptr);
+		CDockAreaWidget* addDockWidget(DockWidgetArea area, CDockWidget* Dockwidget, CDockAreaWidget* DockAreaWidget = nullptr);
 
 		/**
 		 * Adds dockwidget into the given container.
@@ -299,7 +318,8 @@ namespace ads
 		 * container does not yet contain a DockAreaWidget.
 		 * \return Returns the dock area widget that contains the new DockWidget
 		 */
-		CDockAreaWidget* addDockWidgetToContainer(DockWidgetArea area, CDockWidget* Dockwidget,
+		CDockAreaWidget* addDockWidgetToContainer(DockWidgetArea area,
+			CDockWidget* Dockwidget,
 			CDockContainerWidget* DockContainerWidget);
 
 		/**
@@ -308,15 +328,13 @@ namespace ads
 		 * If no dock area widget exists for the given area identifier, a new
 		 * dock area widget is created.
 		 */
-		CDockAreaWidget* addDockWidgetTab(DockWidgetArea area,
-			CDockWidget* Dockwidget);
+		CDockAreaWidget* addDockWidgetTab(DockWidgetArea area, CDockWidget* Dockwidget);
 
 		/**
 		 * This function will add the given Dockwidget to the given DockAreaWidget
 		 * as a new tab.
 		 */
-		CDockAreaWidget* addDockWidgetTabToArea(CDockWidget* Dockwidget,
-			CDockAreaWidget* DockAreaWidget);
+		CDockAreaWidget* addDockWidgetTabToArea(CDockWidget* Dockwidget, CDockAreaWidget* DockAreaWidget);
 
 		/**
 		 * Adds the given DockWidget floating and returns the created
@@ -461,7 +479,10 @@ namespace ads
 		 *         the given ToggleViewAction.
 		 */
 		QAction* addToggleViewActionToMenu(QAction* ToggleViewAction,
-			const QString& Group = QString(), const QIcon& GroupIcon = QIcon());
+			const QString& Group = QString(),
+			const QIcon& GroupIcon = QIcon());
+
+		void removeToggleViewActionFromMenu(QAction* ToggleViewAction, const QString& Group = QString());
 
 		/**
 		 * This function returns the internal view menu.
@@ -469,6 +490,12 @@ namespace ads
 		 * function.
 		 */
 		QMenu* viewMenu() const;
+
+		/**
+		 * This function clears internal view menu, also deleting the
+		 * submenus created inside it.
+		 */
+		void clearViewMenu();
 
 		/**
 		 * Define the insertion order for toggle view menu items.
@@ -496,7 +523,7 @@ namespace ads
 		 * Helper function to set focus depending on the configuration of the
 		 * FocusStyling flag
 		 */
-		template <class QWidgetPtr>
+		template<class QWidgetPtr>
 		static void setWidgetFocus(QWidgetPtr widget)
 		{
 			if (!CDockManager::testConfigFlag(CDockManager::FocusHighlighting))

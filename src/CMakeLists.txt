@@ -80,11 +80,11 @@ set_target_properties(qtadvanceddocking PROPERTIES
 )
 if(QT_VERSION_MAJOR STREQUAL "5")
     set_target_properties(qtadvanceddocking PROPERTIES
-        CXX_STANDARD 14
+        CXX_STANDARD 17
         CXX_STANDARD_REQUIRED ON)
 elseif(QT_VERSION_MAJOR STREQUAL "6")
     set_target_properties(qtadvanceddocking PROPERTIES
-        CXX_STANDARD 17
+        CXX_STANDARD 20
         CXX_STANDARD_REQUIRED ON)
 endif()
 

@@ -28,40 +28,39 @@
 //============================================================================
 //                                   INCLUDES
 //============================================================================
-#include "DockWidgetTab.h"
 #include "DockManager.h"
 
+#include "DockAreaTitleBar.h"
+#include "DockAreaWidget.h"
+#include "DockFocusController.h"
+#include "DockOverlay.h"
+#include "DockSplitter.h"
+#include "DockWidget.h"
+#include "DockWidgetTab.h"
+#include "DockingStateReader.h"
+#include "FloatingDockContainer.h"
+#include "IconProvider.h"
+#include "ads_globals.h"
+
+#include <QAction>
+#include <QApplication>
+#include <QDebug>
+#include <QFile>
+#include <QLayout>
+#include <QList>
+#include <QMainWindow>
+#include <QMap>
+#include <QMenu>
+#include <QPushButton>
+#include <QSettings>
+#include <QStatusBar>
+#include <QVariant>
+#include <QWindow>
+#include <QXmlStreamWriter>
 #include <algorithm>
 #include <iostream>
 
-#include <QMainWindow>
-#include <QList>
-#include <QMap>
-#include <QVariant>
-#include <QDebug>
-#include <QFile>
-#include <QAction>
-#include <QXmlStreamWriter>
-#include <QSettings>
-#include <QMenu>
-#include <QStatusBar>
-#include <QApplication>
-#include <QWindow>
-#include <QLayout>
-#include <QPushButton>
-
-#include "FloatingDockContainer.h"
-#include "DockOverlay.h"
-#include "DockWidget.h"
-#include "ads_globals.h"
-#include "DockAreaWidget.h"
-#include "IconProvider.h"
-#include "DockingStateReader.h"
-#include "DockAreaTitleBar.h"
-#include "DockFocusController.h"
-#include "DockSplitter.h"
-
-//#include "FloatingWidgetTitleBar.h"
+// #include "FloatingWidgetTitleBar.h"
 
 
 /**
@@ -78,7 +77,6 @@ static void initResource()
 	Q_INIT_RESOURCE(ads);
 }
 
-
 namespace ads
 {
 	/**
@@ -86,9 +84,9 @@ namespace ads
 	 */
 	enum eStateFileVersion
 	{
-		InitialVersion = 0,      //!< InitialVersion
-		Version1 = 1,            //!< Version1
-		CurrentVersion = Version1//!< CurrentVersion
+		InitialVersion = 0,		  //!< InitialVersion
+		Version1 = 1,			  //!< Version1
+		CurrentVersion = Version1 //!< CurrentVersion
 	};
 
 	static CDockManager::ConfigFlags StaticConfigFlags = CDockManager::DefaultNonOpaqueConfig;
@@ -170,15 +168,14 @@ namespace ads
 		 */
 		void addActionToMenu(QAction* Action, QMenu* Menu, bool InsertSorted);
 	};
+
 	// struct DockManagerPrivate
 
 	//============================================================================
-	DockManagerPrivate::DockManagerPrivate(CDockManager* _public) :
-		_this(_public)
+	DockManagerPrivate::DockManagerPrivate(CDockManager* _public)
+		: _this(_public)
 	{
-
 	}
-
 
 	//============================================================================
 	void DockManagerPrivate::loadStylesheet()
@@ -186,8 +183,7 @@ namespace ads
 		initResource();
 		QString Result;
 		QString FileName = ":ads/stylesheets/";
-		FileName += CDockManager::testConfigFlag(CDockManager::FocusHighlighting)
-			? "focus_highlighting" : "default";
+		FileName += CDockManager::testConfigFlag(CDockManager::FocusHighlighting) ? "focus_highlighting" : "default";
 #ifdef Q_OS_LINUX
 		FileName += "_linux";
 #endif
@@ -199,7 +195,6 @@ namespace ads
 		StyleSheetFile.close();
 		_this->setStyleSheet(Result);
 	}
-
 
 	//============================================================================
 	bool DockManagerPrivate::restoreContainer(int Index, CDockingStateReader& stream, bool Testing)
@@ -255,10 +250,8 @@ namespace ads
 		return restoreStateFromXml(state, version, internal::RestoreTesting);
 	}
 
-
 	//============================================================================
-	bool DockManagerPrivate::restoreStateFromXml(const QByteArray& state, int version,
-		bool Testing)
+	bool DockManagerPrivate::restoreStateFromXml(const QByteArray& state, int version, bool Testing)
 	{
 		Q_UNUSED(version);
 
@@ -295,7 +288,7 @@ namespace ads
 
 		bool Result = true;
 #ifdef ADS_DEBUG_PRINT
-		int  DockContainers = s.attributes().value("Containers").toInt();
+		int DockContainers = s.attributes().value("Containers").toInt();
 #endif
 		ADS_PRINT(DockContainers);
 
@@ -348,7 +341,6 @@ namespace ads
 		return Result;
 	}
 
-
 	//============================================================================
 	void DockManagerPrivate::restoreDockWidgetsOpenState()
 	{
@@ -369,7 +361,6 @@ namespace ads
 			}
 		}
 	}
-
 
 	//============================================================================
 	void DockManagerPrivate::restoreDockAreasIndices()
@@ -434,7 +425,6 @@ namespace ads
 		}
 	}
 
-
 	//============================================================================
 	bool DockManagerPrivate::restoreState(const QByteArray& State, int version)
 	{
@@ -463,14 +453,14 @@ namespace ads
 		return true;
 	}
 
-
 	//============================================================================
 	void DockManagerPrivate::addActionToMenu(QAction* Action, QMenu* Menu, bool InsertSorted)
 	{
 		if (InsertSorted)
 		{
 			auto Actions = Menu->actions();
-			auto it = std::find_if(Actions.begin(), Actions.end(),
+			auto it = std::find_if(Actions.begin(),
+				Actions.end(),
 				[&Action](const QAction* a)
 				{
 					return a->text().compare(Action->text(), Qt::CaseInsensitive) > 0;
@@ -491,11 +481,10 @@ namespace ads
 		}
 	}
 
-
 	//============================================================================
-	CDockManager::CDockManager(QWidget* parent) :
-		CDockContainerWidget(this, parent),
-		d(new DockManagerPrivate(this))
+	CDockManager::CDockManager(QWidget* parent)
+		: CDockContainerWidget(this, parent)
+		, d(new DockManagerPrivate(this))
 	{
 		createRootSplitter();
 		QMainWindow* MainWindow = qobject_cast<QMainWindow*>(parent);
@@ -508,6 +497,7 @@ namespace ads
 		d->DockAreaOverlay = new CDockOverlay(this, CDockOverlay::ModeDockAreaOverlay);
 		d->ContainerOverlay = new CDockOverlay(this, CDockOverlay::ModeContainerOverlay);
 		d->Containers.append(this);
+		// d->loadStylesheet();
 
 		if (CDockManager::testConfigFlag(CDockManager::FocusHighlighting))
 		{
@@ -517,7 +507,9 @@ namespace ads
 		/*#ifdef Q_OS_LINUX*/
 		window()->installEventFilter(this);
 
-		connect(qApp, &QApplication::focusWindowChanged, [](QWindow* focusWindow)
+		connect(qApp,
+			&QApplication::focusWindowChanged,
+			[](QWindow* focusWindow)
 			{
 				// bring modal dialogs to foreground to ensure that they are in front of any
 				// floating dock widget
@@ -575,8 +567,11 @@ namespace ads
 				// So we just do it ourself.
 				if (QGuiApplication::platformName() == QLatin1String("xcb"))
 				{
-					internal::xcb_update_prop(true, _window->window()->winId(),
-						"_NET_WM_STATE", "_NET_WM_STATE_ABOVE", "_NET_WM_STATE_STAYS_ON_TOP");
+					internal::xcb_update_prop(true,
+						_window->window()->winId(),
+						"_NET_WM_STATE",
+						"_NET_WM_STATE_ABOVE",
+						"_NET_WM_STATE_STAYS_ON_TOP");
 				}
 				else
 				{
@@ -596,8 +591,11 @@ namespace ads
 				if (QGuiApplication::platformName() == QLatin1String("xcb"))
 				{
 #ifdef Q_OS_LINUX
-					internal::xcb_update_prop(false, _window->window()->winId(),
-						"_NET_WM_STATE", "_NET_WM_STATE_ABOVE", "_NET_WM_STATE_STAYS_ON_TOP");
+					internal::xcb_update_prop(false,
+						_window->window()->winId(),
+						"_NET_WM_STATE",
+						"_NET_WM_STATE_ABOVE",
+						"_NET_WM_STATE_STAYS_ON_TOP");
 #endif
 				}
 				else
@@ -644,20 +642,17 @@ namespace ads
 		ADS_PRINT("d->FloatingWidgets.count() " << d->FloatingWidgets.count());
 	}
 
-
 	//============================================================================
 	void CDockManager::removeFloatingWidget(CFloatingDockContainer* FloatingWidget)
 	{
 		d->FloatingWidgets.removeAll(FloatingWidget);
 	}
 
-
 	//============================================================================
 	void CDockManager::registerDockContainer(CDockContainerWidget* DockContainer)
 	{
 		d->Containers.append(DockContainer);
 	}
-
 
 	//============================================================================
 	void CDockManager::removeDockContainer(CDockContainerWidget* DockContainer)
@@ -668,13 +663,11 @@ namespace ads
 		}
 	}
 
-
 	//============================================================================
 	CDockOverlay* CDockManager::containerOverlay() const
 	{
 		return d->ContainerOverlay;
 	}
-
 
 	//============================================================================
 	CDockOverlay* CDockManager::dockAreaOverlay() const
@@ -682,20 +675,17 @@ namespace ads
 		return d->DockAreaOverlay;
 	}
 
-
 	//============================================================================
 	const QList<CDockContainerWidget*> CDockManager::dockContainers() const
 	{
 		return d->Containers;
 	}
 
-
 	//============================================================================
 	const QList<CFloatingDockContainer*> CDockManager::floatingWidgets() const
 	{
 		return d->FloatingWidgets;
 	}
-
 
 	//============================================================================
 	unsigned int CDockManager::zOrderWidgetIndex() const
@@ -730,10 +720,8 @@ namespace ads
 		}
 		s.writeEndDocument();
 
-		return ConfigFlags.testFlag(XmlCompressionEnabled)
-			? qCompress(xmldata, 9) : xmldata;
+		return ConfigFlags.testFlag(XmlCompressionEnabled) ? qCompress(xmldata, 9) : xmldata;
 	}
-
 
 	//============================================================================
 	bool CDockManager::restoreState(const QByteArray& state, int version)
@@ -770,7 +758,6 @@ namespace ads
 		return Result;
 	}
 
-
 	//============================================================================
 	CFloatingDockContainer* CDockManager::addDockWidgetFloating(CDockWidget* Dockwidget)
 	{
@@ -796,7 +783,6 @@ namespace ads
 		return FloatingWidget;
 	}
 
-
 	//============================================================================
 	void CDockManager::showEvent(QShowEvent* event)
 	{
@@ -820,7 +806,6 @@ namespace ads
 		}
 		d->UninitializedFloatingWidgets.clear();
 	}
-
 
 	//============================================================================
 	void CDockManager::restoreHiddenFloatingWidgets()
@@ -858,8 +843,7 @@ namespace ads
 	}
 
 	//============================================================================
-	CDockAreaWidget* CDockManager::addDockWidget(DockWidgetArea area,
-		CDockWidget* Dockwidget, CDockAreaWidget* DockAreaWidget)
+	CDockAreaWidget* CDockManager::addDockWidget(DockWidgetArea area, CDockWidget* Dockwidget, CDockAreaWidget* DockAreaWidget)
 	{
 		d->DockWidgetsMap.insert(Dockwidget->objectName(), Dockwidget);
 		auto Container = DockAreaWidget ? DockAreaWidget->dockContainer() : this;
@@ -870,7 +854,8 @@ namespace ads
 
 	//============================================================================
 	CDockAreaWidget* CDockManager::addDockWidgetToContainer(DockWidgetArea area,
-		CDockWidget* Dockwidget, CDockContainerWidget* DockContainerWidget)
+		CDockWidget* Dockwidget,
+		CDockContainerWidget* DockContainerWidget)
 	{
 		d->DockWidgetsMap.insert(Dockwidget->objectName(), Dockwidget);
 		auto AreaOfAddedDockWidget = DockContainerWidget->addDockWidget(area, Dockwidget);
@@ -878,10 +863,8 @@ namespace ads
 		return AreaOfAddedDockWidget;
 	}
 
-
 	//============================================================================
-	CDockAreaWidget* CDockManager::addDockWidgetTab(DockWidgetArea area,
-		CDockWidget* Dockwidget)
+	CDockAreaWidget* CDockManager::addDockWidgetTab(DockWidgetArea area, CDockWidget* Dockwidget)
 	{
 		CDockAreaWidget* AreaWidget = lastAddedDockAreaWidget(area);
 		if (AreaWidget)
@@ -894,14 +877,11 @@ namespace ads
 		}
 	}
 
-
 	//============================================================================
-	CDockAreaWidget* CDockManager::addDockWidgetTabToArea(CDockWidget* Dockwidget,
-		CDockAreaWidget* DockAreaWidget)
+	CDockAreaWidget* CDockManager::addDockWidgetTabToArea(CDockWidget* Dockwidget, CDockAreaWidget* DockAreaWidget)
 	{
 		return addDockWidget(ads::CenterDockWidgetArea, Dockwidget, DockAreaWidget);
 	}
-
 
 	//============================================================================
 	CDockWidget* CDockManager::findDockWidget(const QString& ObjectName) const
@@ -925,7 +905,6 @@ namespace ads
 		return d->DockWidgetsMap;
 	}
 
-
 	//============================================================================
 	void CDockManager::addPerspective(const QString& UniquePrespectiveName)
 	{
@@ -933,13 +912,11 @@ namespace ads
 		Q_EMIT perspectiveListChanged();
 	}
 
-
 	//============================================================================
 	void CDockManager::removePerspective(const QString& Name)
 	{
 		removePerspectives({ Name });
 	}
-
 
 	//============================================================================
 	void CDockManager::removePerspectives(const QStringList& Names)
@@ -957,13 +934,11 @@ namespace ads
 		}
 	}
 
-
 	//============================================================================
 	QStringList CDockManager::perspectiveNames() const
 	{
 		return d->Perspectives.keys();
 	}
-
 
 	//============================================================================
 	void CDockManager::openPerspective(const QString& PerspectiveName)
@@ -979,7 +954,6 @@ namespace ads
 		Q_EMIT perspectiveOpened(PerspectiveName);
 	}
 
-
 	//============================================================================
 	void CDockManager::savePerspectives(QSettings& Settings) const
 	{
@@ -994,7 +968,6 @@ namespace ads
 		}
 		Settings.endArray();
 	}
-
 
 	//============================================================================
 	void CDockManager::loadPerspectives(QSettings& Settings)
@@ -1025,13 +998,11 @@ namespace ads
 		Q_EMIT perspectiveListLoaded();
 	}
 
-
 	//============================================================================
 	CDockWidget* CDockManager::centralWidget() const
 	{
 		return d->CentralWidget;
 	}
-
 
 	//============================================================================
 	CDockAreaWidget* CDockManager::setCentralWidget(CDockWidget* widget)
@@ -1070,8 +1041,7 @@ namespace ads
 	}
 
 	//============================================================================
-	QAction* CDockManager::addToggleViewActionToMenu(QAction* ToggleViewAction,
-		const QString& Group, const QIcon& GroupIcon)
+	QAction* CDockManager::addToggleViewActionToMenu(QAction* ToggleViewAction, const QString& Group, const QIcon& GroupIcon)
 	{
 		bool AlphabeticallySorted = (MenuAlphabeticallySorted == d->MenuInsertionOrder);
 		if (!Group.isEmpty())
@@ -1099,6 +1069,40 @@ namespace ads
 		}
 	}
 
+	void CDockManager::removeToggleViewActionFromMenu(QAction* ToggleViewAction, const QString& Group /*= QString()*/)
+	{
+		bool AlphabeticallySorted = (MenuAlphabeticallySorted == d->MenuInsertionOrder);
+		if (!Group.isEmpty())
+		{
+			QMenu* GroupMenu = d->ViewMenuGroups.value(Group, 0);
+			if (GroupMenu)
+			{
+				if (GroupMenu->actions().indexOf(ToggleViewAction) >= 0)
+				{
+					GroupMenu->removeAction(ToggleViewAction);
+				}
+				else
+				{
+					qDebug("The action does not exist in this group");
+				}
+			}
+			else
+			{
+				qDebug("The group specified does not exist in the view menu");
+			}
+		}
+		else
+		{
+			if (d->ViewMenu->actions().indexOf(ToggleViewAction) >= 0)
+			{
+				d->ViewMenu->removeAction(ToggleViewAction);
+			}
+			else
+			{
+				qDebug("The action does not exist in this group");
+			}
+		}
+	}
 
 	//============================================================================
 	QMenu* CDockManager::viewMenu() const
@@ -1106,6 +1110,15 @@ namespace ads
 		return d->ViewMenu;
 	}
 
+	void CDockManager::clearViewMenu()
+	{
+		for (auto Group : d->ViewMenuGroups)
+		{
+			Group->deleteLater();
+		}
+		d->ViewMenuGroups.clear();
+		d->ViewMenu->clear();
+	}
 
 	//============================================================================
 	void CDockManager::setViewMenuInsertionOrder(eViewMenuInsertionOrder Order)
@@ -1113,13 +1126,11 @@ namespace ads
 		d->MenuInsertionOrder = Order;
 	}
 
-
 	//===========================================================================
 	bool CDockManager::isRestoringState() const
 	{
 		return d->RestoringState;
 	}
-
 
 	//===========================================================================
 	int CDockManager::startDragDistance()
@@ -1127,20 +1138,17 @@ namespace ads
 		return QApplication::startDragDistance() * 1.5;
 	}
 
-
 	//===========================================================================
 	CDockManager::ConfigFlags CDockManager::configFlags()
 	{
 		return StaticConfigFlags;
 	}
 
-
 	//===========================================================================
 	void CDockManager::setConfigFlags(const ConfigFlags Flags)
 	{
 		StaticConfigFlags = Flags;
 	}
-
 
 	//===========================================================================
 	void CDockManager::setConfigFlag(eConfigFlag Flag, bool On)
@@ -1154,14 +1162,12 @@ namespace ads
 		return configFlags().testFlag(Flag);
 	}
 
-
 	//===========================================================================
 	CIconProvider& CDockManager::iconProvider()
 	{
 		static CIconProvider Instance;
 		return Instance;
 	}
-
 
 	//===========================================================================
 	void CDockManager::notifyWidgetOrAreaRelocation(QWidget* DroppedWidget)
@@ -1172,7 +1178,6 @@ namespace ads
 		}
 	}
 
-
 	//===========================================================================
 	void CDockManager::notifyFloatingWidgetDrop(CFloatingDockContainer* FloatingWidget)
 	{
@@ -1181,7 +1186,6 @@ namespace ads
 			d->FocusController->notifyFloatingWidgetDrop(FloatingWidget);
 		}
 	}
-
 
 	//===========================================================================
 	void CDockManager::setDockWidgetFocused(CDockWidget* DockWidget)
@@ -1266,7 +1270,6 @@ namespace ads
 			Splitter->setSizes(sizes);
 		}
 	}
-
 
 	//===========================================================================
 	CDockFocusController* CDockManager::dockFocusController() const

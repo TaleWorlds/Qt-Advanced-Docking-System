@@ -30,6 +30,7 @@
 //============================================================================
 #include "DockContainerWidget.h"
 
+#include <QApplication>
 #include <QEvent>
 #include <QList>
 #include <QGridLayout>
@@ -1381,7 +1382,7 @@ namespace ads
 	unsigned int CDockContainerWidget::zOrderWindowIndex() const
 	{
 		if ((isFloating() && hasIndependentWidget())
-			|| dynamic_cast<const CDockManager*>(this))
+			|| qobject_cast<const CDockManager*>(this))
 		{
 			return d->zOrderWindowIndex;
 		}
@@ -1418,7 +1419,7 @@ namespace ads
 		if (e->type() == QEvent::WindowActivate)
 		{
 			if ((isFloating() && hasIndependentWidget())
-				|| dynamic_cast<CDockManager*>(this))
+				|| qobject_cast<CDockManager*>(this))
 			{
 				d->zOrderWindowIndex = ++zOrderWindowCounter;
 			}
@@ -1431,7 +1432,7 @@ namespace ads
 		else if (e->type() == QEvent::Show && !d->zOrderWidgetIndex)
 		{
 			if ((isFloating() && hasIndependentWidget())
-				|| dynamic_cast<CDockManager*>(this))
+				|| qobject_cast<CDockManager*>(this))
 			{
 				d->zOrderWindowIndex = ++zOrderWindowCounter;
 			}
