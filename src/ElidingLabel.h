@@ -18,7 +18,6 @@
 ** License along with this library; If not, see <http://www.gnu.org/licenses/>.
 ******************************************************************************/
 
-
 //============================================================================
 /// \file   ElidingLabel.h
 /// \author Uwe Kindler
@@ -35,74 +34,76 @@
 
 namespace ads
 {
-	struct ElidingLabelPrivate;
+struct ElidingLabelPrivate;
 
-	/**
-	 * A QLabel that supports eliding text.
-	 * Because the functions setText() and text() are no virtual functions setting
-	 * and reading the text via a pointer to the base class QLabel does not work
-	 * properly
-	 */
-	class ADS_EXPORT CElidingLabel : public QLabel
-	{
-		Q_OBJECT
-	private:
-		ElidingLabelPrivate* d;
-		friend struct ElidingLabelPrivate;
+/**
+ * A QLabel that supports eliding text.
+ * Because the functions setText() and text() are no virtual functions setting
+ * and reading the text via a pointer to the base class QLabel does not work
+ * properly
+ */
+class ADS_EXPORT CElidingLabel : public QLabel
+{
+    Q_OBJECT
+private:
+    ElidingLabelPrivate* d;
+    friend struct ElidingLabelPrivate;
 
-	protected:
-		virtual void mouseReleaseEvent(QMouseEvent* event) override;
-		virtual void resizeEvent(QResizeEvent* event) override;
-		virtual void mouseDoubleClickEvent(QMouseEvent* ev) override;
+protected:
+    virtual void mouseReleaseEvent(QMouseEvent* event) override;
+    virtual void resizeEvent(QResizeEvent* event) override;
+    virtual void mouseDoubleClickEvent(QMouseEvent* ev) override;
 
-	public:
-		using Super = QLabel;
+public:
+    using Super = QLabel;
 
-		CElidingLabel(QWidget* parent = 0, Qt::WindowFlags f = Qt::WindowFlags());
-		CElidingLabel(const QString& text, QWidget* parent = 0, Qt::WindowFlags f = Qt::WindowFlags());
-		virtual ~CElidingLabel();
+    CElidingLabel(QWidget* parent = nullptr,
+                  Qt::WindowFlags f = Qt::WindowFlags());
+    CElidingLabel(const QString& text, QWidget* parent = nullptr,
+                  Qt::WindowFlags f = Qt::WindowFlags());
+    virtual ~CElidingLabel();
 
-		/**
-		 * Returns the text elide mode.
-		 * The default mode is ElideNone
-		 */
-		Qt::TextElideMode elideMode() const;
+    /**
+     * Returns the text elide mode.
+     * The default mode is ElideNone
+     */
+    Qt::TextElideMode elideMode() const;
 
-		/**
-		 * Sets the text elide mode
-		 */
-		void setElideMode(Qt::TextElideMode mode);
+    /**
+     * Sets the text elide mode
+     */
+    void setElideMode(Qt::TextElideMode mode);
 
-		/**
-		 * This function indicates whether the text on this label is currently elided
-		 */
-		bool isElided() const;
+    /**
+     * This function indicates whether the text on this label is currently elided
+     */
+    bool isElided() const;
 
-	public: // reimplements QLabel ----------------------------------------------
-		virtual QSize minimumSizeHint() const override;
-		virtual QSize sizeHint() const override;
-		void setText(const QString& text);
-		QString text() const;
+public:  // reimplements QLabel ----------------------------------------------
+    virtual QSize minimumSizeHint() const override;
+    virtual QSize sizeHint() const override;
+    void setText(const QString& text);
+    QString text() const;
 
-	Q_SIGNALS:
-		/**
-		 * This signal is emitted if the user clicks on the label (i.e. pressed
-		 * down then released while the mouse cursor is inside the label)
-		 */
-		void clicked();
+Q_SIGNALS:
+    /**
+     * This signal is emitted if the user clicks on the label (i.e. pressed
+     * down then released while the mouse cursor is inside the label)
+     */
+    void clicked();
 
-		/**
-		 * This signal is emitted if the user does a double click on the label
-		 */
-		void doubleClicked();
+    /**
+     * This signal is emitted if the user does a double click on the label
+     */
+    void doubleClicked();
 
-		/**
-		 * This signal is emitted when isElided() state of this label is changed
-		 */
-		void elidedChanged(bool elided);
-	}; //class CElidingLabel
+    /**
+     * This signal is emitted when isElided() state of this label is changed
+     */
+    void elidedChanged(bool elided);
+};  // class CElidingLabel
 
-} // namespace QtLabb
+}  // namespace ads
 
 //---------------------------------------------------------------------------
-#endif // ElidingLabelH
+#endif  // ElidingLabelH

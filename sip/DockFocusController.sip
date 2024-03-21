@@ -22,6 +22,8 @@ public:
 	void notifyFloatingWidgetDrop(ads::CFloatingDockContainer* FloatingWidget);
     ads::CDockWidget* focusedDockWidget() const;
     void setDockWidgetTabFocused(ads::CDockWidgetTab* Tab);
+    void clearDockWidgetFocus(ads::CDockWidget* dockWidget);
+    void setDockWidgetTabPressed(bool Value);
 
 public slots:
 	void setDockWidgetFocused(ads::CDockWidget* focusedNow);

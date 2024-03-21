@@ -10,60 +10,67 @@
 //============================================================================
 #include "DockComponentsFactory.h"
 
+#include <AutoHideTab.h>
+
 #include <memory>
 
-#include "DockWidgetTab.h"
 #include "DockAreaTabBar.h"
 #include "DockAreaTitleBar.h"
-#include "DockWidget.h"
 #include "DockAreaWidget.h"
+#include "DockWidget.h"
+#include "DockWidgetTab.h"
 
 namespace ads
 {
-	static std::unique_ptr<CDockComponentsFactory> DefaultFactory(new CDockComponentsFactory());
+static std::unique_ptr<CDockComponentsFactory> DefaultFactory(
+    new CDockComponentsFactory());
 
+//============================================================================
+CDockWidgetTab* CDockComponentsFactory::createDockWidgetTab(
+    CDockWidget* DockWidget) const
+{
+    return new CDockWidgetTab(DockWidget);
+}
 
-	//============================================================================
-	CDockWidgetTab* CDockComponentsFactory::createDockWidgetTab(CDockWidget* DockWidget) const
-	{
-		return new CDockWidgetTab(DockWidget);
-	}
+//============================================================================
+CAutoHideTab* CDockComponentsFactory::createDockWidgetSideTab(
+    CDockWidget* DockWidget) const
+{
+    return new CAutoHideTab(DockWidget);
+}
 
+//============================================================================
+CDockAreaTabBar* CDockComponentsFactory::createDockAreaTabBar(
+    CDockAreaWidget* DockArea) const
+{
+    return new CDockAreaTabBar(DockArea);
+}
 
-	//============================================================================
-	CDockAreaTabBar* CDockComponentsFactory::createDockAreaTabBar(CDockAreaWidget* DockArea) const
-	{
-		return new CDockAreaTabBar(DockArea);
-	}
+//============================================================================
+CDockAreaTitleBar* CDockComponentsFactory::createDockAreaTitleBar(
+    CDockAreaWidget* DockArea) const
+{
+    return new CDockAreaTitleBar(DockArea);
+}
 
+//============================================================================
+const CDockComponentsFactory* CDockComponentsFactory::factory()
+{
+    return DefaultFactory.get();
+}
 
-	//============================================================================
-	CDockAreaTitleBar* CDockComponentsFactory::createDockAreaTitleBar(CDockAreaWidget* DockArea) const
-	{
-		return new CDockAreaTitleBar(DockArea);
-	}
+//============================================================================
+void CDockComponentsFactory::setFactory(CDockComponentsFactory* Factory)
+{
+    DefaultFactory.reset(Factory);
+}
 
-
-	//============================================================================
-	const CDockComponentsFactory* CDockComponentsFactory::factory()
-	{
-		return DefaultFactory.get();
-	}
-
-
-	//============================================================================
-	void CDockComponentsFactory::setFactory(CDockComponentsFactory* Factory)
-	{
-		DefaultFactory.reset(Factory);
-	}
-
-
-	//============================================================================
-	void CDockComponentsFactory::resetDefaultFactory()
-	{
-		DefaultFactory.reset(new CDockComponentsFactory());
-	}
-} // namespace ads
+//============================================================================
+void CDockComponentsFactory::resetDefaultFactory()
+{
+    DefaultFactory.reset(new CDockComponentsFactory());
+}
+}  // namespace ads
 
 //---------------------------------------------------------------------------
 // EOF DockComponentsFactory.cpp

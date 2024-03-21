@@ -38,7 +38,9 @@
 #include <QStyle>
 #include <QMouseEvent>
 
-#ifdef Q_OS_LINUX
+#include <iostream>
+
+#if defined(Q_OS_UNIX) && !defined(Q_OS_MACOS)
 #include <xcb/xcb.h>
 #endif
 
@@ -69,6 +71,7 @@ QT_FORWARD_DECLARE_CLASS(QSplitter)
 
 namespace ads
 {
+Q_NAMESPACE
 	class CDockSplitter;
 
 	enum DockWidgetArea
@@ -79,20 +82,34 @@ namespace ads
 		TopDockWidgetArea = 0x04,
 		BottomDockWidgetArea = 0x08,
 		CenterDockWidgetArea = 0x10,
+		LeftAutoHideArea = 0x20,
+		RightAutoHideArea = 0x40,
+		TopAutoHideArea = 0x80,
+		BottomAutoHideArea = 0x100,
 
 		InvalidDockWidgetArea = NoDockWidgetArea,
 		OuterDockAreas = TopDockWidgetArea | LeftDockWidgetArea | RightDockWidgetArea | BottomDockWidgetArea,
+		AutoHideDockAreas = LeftAutoHideArea | RightAutoHideArea | TopAutoHideArea | BottomAutoHideArea,
 		AllDockAreas = OuterDockAreas | CenterDockWidgetArea
 	};
 	Q_DECLARE_FLAGS(DockWidgetAreas, DockWidgetArea)
 
 
-		enum TitleBarButton
+	enum eTabIndex
+	{
+		TabDefaultInsertIndex = -1,
+		TabInvalidIndex = -2
+	};
+
+
+	enum TitleBarButton
 	{
 		TitleBarButtonTabsMenu,
 		TitleBarButtonUndock,
-		TitleBarButtonClose,
-		TitleBarButtonAdd
+        TitleBarButtonClose,
+        TitleBarButtonAdd,
+		TitleBarButtonAutoHide,
+		TitleBarButtonMinimize
 	};
 
 	/**
@@ -112,9 +129,11 @@ namespace ads
 	enum eIcon
 	{
 		TabCloseIcon,      //!< TabCloseIcon
+		AutoHideIcon,      //!< AutoHideIcon
 		DockAreaMenuIcon,  //!< DockAreaMenuIcon
 		DockAreaUndockIcon,//!< DockAreaUndockIcon
 		DockAreaCloseIcon, //!< DockAreaCloseIcon
+		DockAreaMinimizeIcon,
 
 		IconCount,         //!< just a delimiter for range checks
 	};
@@ -129,38 +148,55 @@ namespace ads
 	};
 
 
+/**
+ * Each dock container supports 4 sidebars
+ */
+enum SideBarLocation
+{
+	SideBarTop,
+	SideBarLeft,
+	SideBarRight,
+	SideBarBottom,
+	SideBarNone
+};
+Q_ENUMS(SideBarLocation);
+
+
 	namespace internal
 	{
-		static const bool RestoreTesting = true;
-		static const bool Restore = false;
-		static const char* const ClosedProperty = "close";
-		static const char* const DirtyProperty = "dirty";
+	static const bool RestoreTesting = true;
+	static const bool Restore = false;
+	static const char* const ClosedProperty = "close";
+	static const char* const DirtyProperty = "dirty";
+	static const char* const LocationProperty = "Location";
+	extern const int FloatingWidgetDragStartEvent;
+	extern const int DockedWidgetDragStartEvent;
 
-#ifdef Q_OS_LINUX
-		// Utils to directly communicate with the X server
-		/**
-		 * Get atom from cache or request it from the XServer.
-		 */
-		xcb_atom_t xcb_get_atom(const char* name);
+	#if defined(Q_OS_UNIX) && !defined(Q_OS_MACOS)
+	// Utils to directly communicate with the X server
+	/**
+	 * Get atom from cache or request it from the XServer.
+	 */
+	xcb_atom_t xcb_get_atom(const char *name);
 
-		/**
-		 * Add a property to a window. Only works on "hidden" windows.
-		 */
-		void xcb_add_prop(bool state, WId window, const char* type, const char* prop);
-		/**
-		 * Updates up to two window properties. Can be set on a visible window.
-		 */
-		void xcb_update_prop(bool set, WId window, const char* type, const char* prop, const char* prop2 = nullptr);
-		/**
-		 * Only for debugging purposes.
-		 */
-		bool xcb_dump_props(WId window, const char* type);
-		/**
-		 * Gets the active window manager from the X11 Server.
-		 * Requires a EWMH conform window manager (Allmost all common used ones are).
-		 * Returns "UNKNOWN" otherwise.
-		 */
-		QString windowManager();
+	/**
+	 * Add a property to a window. Only works on "hidden" windows.
+	 */
+	void xcb_add_prop(bool state, WId window, const char *type, const char *prop);
+	/**
+	 * Updates up to two window properties. Can be set on a visible window.
+	 */
+	void xcb_update_prop(bool set, WId window, const char *type, const char *prop, const char *prop2 = nullptr);
+	/**
+	 * Only for debugging purposes.
+	 */
+	bool xcb_dump_props(WId window, const char *type);
+	/**
+	 * Gets the active window manager from the X11 Server.
+	 * Requires a EWMH conform window manager (Almost all common used ones are).
+	 * Returns "UNKNOWN" otherwise.
+	 */
+	QString windowManager();
 #endif
 
 		/**
@@ -174,6 +210,7 @@ namespace ads
 		 */
 		void hideEmptyParentSplitters(CDockSplitter* FirstParentSplitter);
 
+
 		/**
 		 * Convenience class for QPair to provide better naming than first and
 		 * second
@@ -182,15 +219,34 @@ namespace ads
 		{
 		public:
 			using QPair<Qt::Orientation, bool>::QPair;
-			Qt::Orientation orientation() const { return this->first; }
-			bool append() const { return this->second; }
-			int insertOffset() const { return append() ? 1 : 0; }
+			Qt::Orientation orientation() const {return this->first;}
+			bool append() const {return this->second;}
+			int insertOffset() const {return append() ? 1 : 0;}
 		};
 
 		/**
 		 * Returns the insertion parameters for the given dock area
 		 */
 		CDockInsertParam dockAreaInsertParameters(DockWidgetArea Area);
+
+
+		/**
+		 * Returns the SieBarLocation for the AutoHide dock widget areas
+		 */
+		SideBarLocation toSideBarLocation(DockWidgetArea Area);
+
+
+		/**
+		 * Returns true for the top or bottom side bar ansd false for the
+		 * left and right side bar
+		 */
+		bool isHorizontalSideBarLocation(SideBarLocation Location);
+
+
+		/**
+		 * Returns true, if the given dock area is a SideBar area
+		 */
+		bool isSideBarArea(DockWidgetArea Area);
 
 		/**
 		 * Searches for the parent widget of the given type.
@@ -214,7 +270,7 @@ namespace ads
 				}
 				parentWidget = parentWidget->parentWidget();
 			}
-			return 0;
+			return nullptr;
 		}
 
 		/**
@@ -305,6 +361,11 @@ namespace ads
 		 */
 		void repolishStyle(QWidget* w, eRepolishChildOptions Options = RepolishIgnoreChildren);
 
+
+/**
+ * Returns the geometry of the given widget in global space
+ */
+QRect globalGeometry(QWidget* w);
 
 	} // namespace internal
 } // namespace ads

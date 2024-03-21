@@ -16,7 +16,6 @@
 ** License along with this library; If not, see <http://www.gnu.org/licenses/>.
 ******************************************************************************/
 
-
 //============================================================================
 /// \file   DockSplitter.cpp
 /// \author Uwe Kindler
@@ -29,94 +28,87 @@
 //============================================================================
 #include "DockSplitter.h"
 
-#include <QDebug>
 #include <QChildEvent>
+#include <QDebug>
 #include <QVariant>
+
 #include "DockAreaWidget.h"
 
 namespace ads
 {
-	/**
-	 * Private dock splitter data
-	 */
-	struct DockSplitterPrivate
-	{
-		CDockSplitter* _this;
-		int VisibleContentCount = 0;
+/**
+ * Private dock splitter data
+ */
+struct DockSplitterPrivate
+{
+    CDockSplitter* _this;
+    int VisibleContentCount = 0;
 
-		DockSplitterPrivate(CDockSplitter* _public) : _this(_public) {}
-	};
+    DockSplitterPrivate(CDockSplitter* _public) : _this(_public) {}
+};
 
-	//============================================================================
-	CDockSplitter::CDockSplitter(QWidget* parent)
-		: QSplitter(parent),
-		d(new DockSplitterPrivate(this))
-	{
-		setProperty("ads-splitter", QVariant(true));
-		setChildrenCollapsible(false);
-	}
+//============================================================================
+CDockSplitter::CDockSplitter(QWidget* parent)
+    : QSplitter(parent), d(new DockSplitterPrivate(this))
+{
+    setProperty("ads-splitter", QVariant(true));
+    setChildrenCollapsible(false);
+}
 
+//============================================================================
+CDockSplitter::CDockSplitter(Qt::Orientation orientation, QWidget* parent)
+    : QSplitter(orientation, parent), d(new DockSplitterPrivate(this))
+{}
 
-	//============================================================================
-	CDockSplitter::CDockSplitter(Qt::Orientation orientation, QWidget* parent)
-		: QSplitter(orientation, parent),
-		d(new DockSplitterPrivate(this))
-	{
+//============================================================================
+CDockSplitter::~CDockSplitter()
+{
+    ADS_PRINT("~CDockSplitter");
+    delete d;
+}
 
-	}
+//============================================================================
+bool CDockSplitter::hasVisibleContent() const
+{
+    // TODO Cache or precalculate this to speed up
+    for (int i = 0; i < count(); ++i)
+    {
+        if (!widget(i)->isHidden())
+        {
+            return true;
+        }
+    }
 
-	//============================================================================
-	CDockSplitter::~CDockSplitter()
-	{
-		ADS_PRINT("~CDockSplitter");
-		delete d;
-	}
+    return false;
+}
 
+//============================================================================
+QWidget* CDockSplitter::firstWidget() const
+{
+    return (count() > 0) ? widget(0) : nullptr;
+}
 
-	//============================================================================
-	bool CDockSplitter::hasVisibleContent() const
-	{
-		// TODO Cache or precalculate this to speed up
-		for (int i = 0; i < count(); ++i)
-		{
-			if (!widget(i)->isHidden())
-			{
-				return true;
-			}
-		}
+//============================================================================
+QWidget* CDockSplitter::lastWidget() const
+{
+    return (count() > 0) ? widget(count() - 1) : nullptr;
+}
 
-		return false;
-	}
+//============================================================================
+bool CDockSplitter::isResizingWithContainer() const
+{
+    for (auto area : findChildren<CDockAreaWidget*>())
+    {
+        if (area->isCentralWidgetArea())
+        {
+            return true;
+        }
+    }
 
+    return false;
+}
 
-	//============================================================================
-	QWidget* CDockSplitter::firstWidget() const
-	{
-		return (count() > 0) ? widget(0) : nullptr;
-	}
-
-
-	//============================================================================
-	QWidget* CDockSplitter::lastWidget() const
-	{
-		return (count() > 0) ? widget(count() - 1) : nullptr;
-	}
-
-	//============================================================================
-	bool CDockSplitter::isResizingWithContainer() const
-	{
-		for (auto area : findChildren<CDockAreaWidget*>())
-		{
-			if (area->isCentralWidgetArea())
-			{
-				return true;
-			}
-		}
-
-		return false;
-	}
-
-} // namespace ads
+}  // namespace ads
 
 //---------------------------------------------------------------------------
 // EOF DockSplitter.cpp

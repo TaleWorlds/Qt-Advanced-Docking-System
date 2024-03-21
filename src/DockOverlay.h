@@ -18,14 +18,13 @@
 ** License along with this library; If not, see <http://www.gnu.org/licenses/>.
 ******************************************************************************/
 
-
 //============================================================================
 //                                   INCLUDES
 //============================================================================
-#include <QPointer>
-#include <QHash>
-#include <QRect>
 #include <QFrame>
+#include <QHash>
+#include <QPointer>
+#include <QRect>
 
 #include "ads_globals.h"
 
@@ -33,232 +32,266 @@ QT_FORWARD_DECLARE_CLASS(QGridLayout)
 
 namespace ads
 {
-	struct DockOverlayPrivate;
-	class CDockOverlayCross;
+struct DockOverlayPrivate;
+class CDockOverlayCross;
 
-	/*!
-	 * DockOverlay paints a translucent rectangle over another widget. The geometry
-	 * of the rectangle is based on the mouse location.
-	 */
-	class ADS_EXPORT CDockOverlay : public QFrame
-	{
-		Q_OBJECT
-	private:
-		DockOverlayPrivate* d; //< private data class
-		friend struct DockOverlayPrivate;
-		friend class DockOverlayCross;
+/*!
+ * DockOverlay paints a translucent rectangle over another widget. The geometry
+ * of the rectangle is based on the mouse location.
+ */
+class ADS_EXPORT CDockOverlay : public QFrame
+{
+    Q_OBJECT
+private:
+    DockOverlayPrivate* d;  //< private data class
+    friend struct DockOverlayPrivate;
+    friend class DockOverlayCross;
 
-	public:
-		using Super = QFrame;
+public:
+    using Super = QFrame;
 
-		enum eMode
-		{
-			ModeDockAreaOverlay,
-			ModeContainerOverlay
-		};
+    enum eMode
+    {
+        ModeDockAreaOverlay,
+        ModeContainerOverlay
+    };
 
-		/**
-		 * Creates a dock overlay
-		 */
-		CDockOverlay(QWidget* parent, eMode Mode = ModeDockAreaOverlay);
+    /**
+     * Creates a dock overlay
+     */
+    CDockOverlay(QWidget* parent, eMode Mode = ModeDockAreaOverlay);
 
-		/**
-		 * Virtual destructor
-		 */
-		virtual ~CDockOverlay();
+    /**
+     * Virtual destructor
+     */
+    virtual ~CDockOverlay();
 
-		/**
-		 * Configures the areas that are allowed for docking
-		 */
-		void setAllowedAreas(DockWidgetAreas areas);
+    /**
+     * Configures the areas that are allowed for docking
+     */
+    void setAllowedAreas(DockWidgetAreas areas);
 
-		/**
-		 * Returns flags with all allowed drop areas
-		 */
-		DockWidgetAreas allowedAreas() const;
+    /**
+     * Enable / disable a certain area
+     */
+    void setAllowedArea(DockWidgetArea area, bool Enable);
 
-		/**
-		 * Returns the drop area under the current cursor location
-		 */
-		DockWidgetArea dropAreaUnderCursor() const;
+    /**
+     * Returns flags with all allowed drop areas
+     */
+    DockWidgetAreas allowedAreas() const;
 
-		/**
-		 * This function returns the same like dropAreaUnderCursor() if this
-		 * overlay is not hidden and if drop preview is enabled and returns
-		 * InvalidDockWidgetArea if it is hidden or drop preview is disabled.
-		 */
-		DockWidgetArea visibleDropAreaUnderCursor() const;
+    /**
+     * Returns the drop area under the current cursor location
+     */
+    DockWidgetArea dropAreaUnderCursor() const;
 
-		/**
-		 * Show the drop overly for the given target widget
-		 */
-		DockWidgetArea showOverlay(QWidget* target);
+    /**
+     * If the drop area is the CenterDockWidgetArea or a sidebar area,
+     * then this function returns the index of the tab under cursor.
+     * Call this function after call to dropAreaUnderCursor() because this
+     * function updates the tab index.
+     * A value of -1 indicates a position before the first tab and a value of
+     * tabCount() indicates a position behind the last tab.
+     * A value of -2 indicates an valid value
+     */
+    int tabIndexUnderCursor() const;
 
-		/**
-		 * Hides the overlay
-		 */
-		void hideOverlay();
+    /**
+     * This function returns the same like dropAreaUnderCursor() if this
+     * overlay is not hidden and if drop preview is enabled and returns
+     * InvalidDockWidgetArea if it is hidden or drop preview is disabled.
+     */
+    DockWidgetArea visibleDropAreaUnderCursor() const;
 
-		/**
-		 * Enables / disables the semi transparent overlay rectangle that represents
-		 * the future area of the dropped widget
-		 */
-		void enableDropPreview(bool Enable);
+    /**
+     * Show the drop overly for the given target widget
+     */
+    DockWidgetArea showOverlay(QWidget* target);
 
-		/**
-		 * Returns true if drop preview is enabled
-		 */
-		bool dropPreviewEnabled() const;
+    /**
+     * Hides the overlay
+     */
+    void hideOverlay();
 
-		/**
-		 * The drop overlay rectangle for the target area
-		 */
-		QRect dropOverlayRect() const;
+    /**
+     * Enables / disables the semi transparent overlay rectangle that represents
+     * the future area of the dropped widget
+     */
+    void enableDropPreview(bool Enable);
 
-		/**
-		 * Handle polish events
-		 */
-		virtual bool event(QEvent* e) override;
+    /**
+     * Returns true if drop preview is enabled
+     */
+    bool dropPreviewEnabled() const;
 
-	protected:
-		virtual void paintEvent(QPaintEvent* e) override;
-		virtual void showEvent(QShowEvent* e) override;
-		virtual void hideEvent(QHideEvent* e) override;
-	};
+    /**
+     * The drop overlay rectangle for the target area
+     */
+    QRect dropOverlayRect() const;
 
+    /**
+     * Handle polish events
+     */
+    virtual bool event(QEvent* e) override;
 
-	struct DockOverlayCrossPrivate;
-	/*!
-	 * DockOverlayCross shows a cross with 5 different drop area possibilities.
-	 * I could have handled everything inside DockOverlay, but because of some
-	 * styling issues it's better to have a separate class for the cross.
-	 * You can style the cross icon using the property system.
-	 * \code
-	 * ads--CDockOverlayCross
-	  {
-			qproperty-iconFrameColor: palette(highlight);
-			qproperty-iconBackgroundColor: palette(base);
-			qproperty-iconOverlayColor: palette(highlight);
-			qproperty-iconArrowColor: rgb(227, 227, 227);
-			qproperty-iconShadowColor: rgb(0, 0, 0);
-		}
-	 * \endcode
-	 * Or you can use the iconColors property to pass in AARRGGBB values as
-	 * hex string like shown in the example below.
-	 * \code
-	 * ads--CDockOverlayCross
-	 * {
-	 *     qproperty-iconColors: "Frame=#ff3d3d3d Background=#ff929292 Overlay=#1f3d3d3d Arrow=#ffb4b4b4 Shadow=#40474747";
-	 * }
-	 * \endcode
-	 */
-	class CDockOverlayCross : public QWidget
-	{
-		Q_OBJECT
-			Q_PROPERTY(QString iconColors READ iconColors WRITE setIconColors)
-			Q_PROPERTY(QColor iconFrameColor READ iconColor WRITE setIconFrameColor)
-			Q_PROPERTY(QColor iconBackgroundColor READ iconColor WRITE setIconBackgroundColor)
-			Q_PROPERTY(QColor iconOverlayColor READ iconColor WRITE setIconOverlayColor)
-			Q_PROPERTY(QColor iconArrowColor READ iconColor WRITE setIconArrowColor)
-			Q_PROPERTY(QColor iconShadowColor READ iconColor WRITE setIconShadowColor)
+protected:
+    virtual void paintEvent(QPaintEvent* e) override;
+    virtual void showEvent(QShowEvent* e) override;
+    virtual void hideEvent(QHideEvent* e) override;
+};
 
-	public:
-		enum eIconColor
-		{
-			FrameColor,///< the color of the frame of the small window icon
-			WindowBackgroundColor,///< the background color of the small window in the icon
-			OverlayColor,///< the color that shows the overlay (the dock side) in the icon
-			ArrowColor,///< the arrow that points into the direction
-			ShadowColor///< the color of the shadow rectangle that is painted below the icons
-		};
+struct DockOverlayCrossPrivate;
+/*!
+ * DockOverlayCross shows a cross with 5 different drop area possibilities.
+ * I could have handled everything inside DockOverlay, but because of some
+ * styling issues it's better to have a separate class for the cross.
+ * You can style the cross icon using the property system.
+ * \code
+ * ads--CDockOverlayCross
+  {
+        qproperty-iconFrameColor: palette(highlight);
+        qproperty-iconBackgroundColor: palette(base);
+        qproperty-iconOverlayColor: palette(highlight);
+        qproperty-iconArrowColor: rgb(227, 227, 227);
+        qproperty-iconShadowColor: rgb(0, 0, 0);
+    }
+ * \endcode
+ * Or you can use the iconColors property to pass in AARRGGBB values as
+ * hex string like shown in the example below.
+ * \code
+ * ads--CDockOverlayCross
+ * {
+ *     qproperty-iconColors: "Frame=#ff3d3d3d Background=#ff929292
+ Overlay=#1f3d3d3d Arrow=#ffb4b4b4 Shadow=#40474747";
+ * }
+ * \endcode
+ */
+class CDockOverlayCross : public QWidget
+{
+    Q_OBJECT
+    Q_PROPERTY(QString iconColors READ iconColors WRITE setIconColors)
+    Q_PROPERTY(QColor iconFrameColor READ iconColor WRITE setIconFrameColor)
+    Q_PROPERTY(
+        QColor iconBackgroundColor READ iconColor WRITE setIconBackgroundColor)
+    Q_PROPERTY(QColor iconOverlayColor READ iconColor WRITE setIconOverlayColor)
+    Q_PROPERTY(QColor iconArrowColor READ iconColor WRITE setIconArrowColor)
+    Q_PROPERTY(QColor iconShadowColor READ iconColor WRITE setIconShadowColor)
 
-	private:
-		DockOverlayCrossPrivate* d;
-		friend struct DockOverlayCrossPrivate;
-		friend class CDockOverlay;
+public:
+    enum eIconColor
+    {
+        FrameColor,  ///< the color of the frame of the small window icon
+        WindowBackgroundColor,  ///< the background color of the small window in
+                                ///< the icon
+        OverlayColor,  ///< the color that shows the overlay (the dock side) in
+                       ///< the icon
+        ArrowColor,    ///< the arrow that points into the direction
+        ShadowColor  ///< the color of the shadow rectangle that is painted below
+                     ///< the icons
+    };
 
-	protected:
-		/**
-		 * This function returns an empty string and is only here to silence
-		 * moc
-		 */
-		QString iconColors() const;
+private:
+    DockOverlayCrossPrivate* d;
+    friend struct DockOverlayCrossPrivate;
+    friend class CDockOverlay;
 
-		/**
-		 * This is a dummy function for the property system
-		 */
-		QColor iconColor() const { return QColor(); }
-		void setIconFrameColor(const QColor& Color) { setIconColor(FrameColor, Color); }
-		void setIconBackgroundColor(const QColor& Color) { setIconColor(WindowBackgroundColor, Color); }
-		void setIconOverlayColor(const QColor& Color) { setIconColor(OverlayColor, Color); }
-		void setIconArrowColor(const QColor& Color) { setIconColor(ArrowColor, Color); }
-		void setIconShadowColor(const QColor& Color) { setIconColor(ShadowColor, Color); }
+protected:
+    /**
+     * This function returns an empty string and is only here to silence
+     * moc
+     */
+    QString iconColors() const;
 
-	public:
-		/**
-		 * Creates an overlay cross for the given overlay
-		 */
-		CDockOverlayCross(CDockOverlay* overlay);
+    /**
+     * This is a dummy function for the property system
+     */
+    QColor iconColor() const { return QColor(); }
+    void setIconFrameColor(const QColor& Color)
+    {
+        setIconColor(FrameColor, Color);
+    }
+    void setIconBackgroundColor(const QColor& Color)
+    {
+        setIconColor(WindowBackgroundColor, Color);
+    }
+    void setIconOverlayColor(const QColor& Color)
+    {
+        setIconColor(OverlayColor, Color);
+    }
+    void setIconArrowColor(const QColor& Color)
+    {
+        setIconColor(ArrowColor, Color);
+    }
+    void setIconShadowColor(const QColor& Color)
+    {
+        setIconColor(ShadowColor, Color);
+    }
 
-		/**
-		 * Virtual destructor
-		 */
-		virtual ~CDockOverlayCross();
+public:
+    /**
+     * Creates an overlay cross for the given overlay
+     */
+    CDockOverlayCross(CDockOverlay* overlay);
 
-		/**
-		 * Sets a certain icon color
-		 */
-		void setIconColor(eIconColor ColorIndex, const QColor& Color);
+    /**
+     * Virtual destructor
+     */
+    virtual ~CDockOverlayCross();
 
-		/**
-		 * Returns the icon color given by ColorIndex
-		 */
-		QColor iconColor(eIconColor ColorIndex) const;
+    /**
+     * Sets a certain icon color
+     */
+    void setIconColor(eIconColor ColorIndex, const QColor& Color);
 
-		/**
-		 * Returns the dock widget area depending on the current cursor location.
-		 * The function checks, if the mouse cursor is inside of any drop indicator
-		 * widget and returns the corresponding DockWidgetArea.
-		 */
-		DockWidgetArea cursorLocation() const;
+    /**
+     * Returns the icon color given by ColorIndex
+     */
+    QColor iconColor(eIconColor ColorIndex) const;
 
-		/**
-		 * Sets up the overlay cross for the given overlay mode
-		 */
-		void setupOverlayCross(CDockOverlay::eMode Mode);
+    /**
+     * Returns the dock widget area depending on the current cursor location.
+     * The function checks, if the mouse cursor is inside of any drop indicator
+     * widget and returns the corresponding DockWidgetArea.
+     */
+    DockWidgetArea cursorLocation() const;
 
-		/**
-		 * Recreates the overlay icons.
-		 */
-		void updateOverlayIcons();
+    /**
+     * Sets up the overlay cross for the given overlay mode
+     */
+    void setupOverlayCross(CDockOverlay::eMode Mode);
 
-		/**
-		 * Resets and updates the
-		 */
-		void reset();
+    /**
+     * Recreates the overlay icons.
+     */
+    void updateOverlayIcons();
 
-		/**
-		 * Updates the current position
-		 */
-		void updatePosition();
+    /**
+     * Resets and updates the
+     */
+    void reset();
 
-		/**
-		 * A string with all icon colors to set.
-		 * You can use this property to style the overly icon via CSS stylesheet
-		 * file. The colors are set via a color identifier and a hex AARRGGBB value like
-		 * in the example below.
-		 * \code
-		 * ads--CDockOverlayCross
-		 * {
-		 *     qproperty-iconColors: "Frame=#ff3d3d3d Background=#ff929292 Overlay=#1f3d3d3d Arrow=#ffb4b4b4 Shadow=#40474747";
-		 * }
-		 */
-		void setIconColors(const QString& Colors);
+    /**
+     * Updates the current position
+     */
+    void updatePosition();
 
-	protected:
-		virtual void showEvent(QShowEvent* e) override;
-		void setAreaWidgets(const QHash<DockWidgetArea, QWidget*>& widgets);
-	}; // CDockOverlayCross
+    /**
+     * A string with all icon colors to set.
+     * You can use this property to style the overly icon via CSS stylesheet
+     * file. The colors are set via a color identifier and a hex AARRGGBB value
+     * like in the example below. \code ads--CDockOverlayCross
+     * {
+     *     qproperty-iconColors: "Frame=#ff3d3d3d Background=#ff929292
+     * Overlay=#1f3d3d3d Arrow=#ffb4b4b4 Shadow=#40474747";
+     * }
+     */
+    void setIconColors(const QString& Colors);
 
-} // namespace ads
-#endif // DockOverlayH
+protected:
+    virtual void showEvent(QShowEvent* e) override;
+    void setAreaWidgets(const QHash<DockWidgetArea, QWidget*>& widgets);
+};  // CDockOverlayCross
+
+}  // namespace ads
+#endif  // DockOverlayH

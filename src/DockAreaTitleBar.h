@@ -18,7 +18,6 @@
 ** License along with this library; If not, see <http://www.gnu.org/licenses/>.
 ******************************************************************************/
 
-
 //============================================================================
 /// \file   DockAreaTitleBar.h
 /// \author Uwe Kindler
@@ -26,11 +25,11 @@
 /// \brief  Declaration of CDockAreaTitleBar class
 //============================================================================
 
-
 //============================================================================
 //                                   INCLUDES
 //============================================================================
 #include <QFrame>
+#include <QToolButton>
 
 #include "ads_globals.h"
 
@@ -38,132 +37,226 @@ QT_FORWARD_DECLARE_CLASS(QAbstractButton)
 
 namespace ads
 {
-	class CDockAreaTabBar;
-	class CDockAreaWidget;
-	struct DockAreaTitleBarPrivate;
+class CDockAreaTabBar;
+class CDockAreaWidget;
+struct DockAreaTitleBarPrivate;
+class CElidingLabel;
+class CDockAreaTitleBar;
 
-	/**
-	 * Title bar of a dock area.
-	 * The title bar contains a tabbar with all tabs for a dock widget group and
-	 * with a tabs menu button, a undock button and a close button.
-	 */
-	class ADS_EXPORT CDockAreaTitleBar : public QFrame
-	{
-		Q_PROPERTY(bool focused READ isFocused)
-			Q_OBJECT
-	private:
-		DockAreaTitleBarPrivate* d; ///< private data (pimpl)
-		friend struct DockAreaTitleBarPrivate;
+using tTitleBarButton = QToolButton;
 
-	private Q_SLOTS:
-		void onTabsMenuAboutToShow();
-		void onCloseButtonClicked();
-		void onUndockButtonClicked();
-		void onTabsMenuActionTriggered(QAction* Action);
-		void onCurrentTabChanged(int Index);
-		void onAddButtonClicked(bool checked = false);
+/**
+ * Title bar button of a dock area that customizes tTitleBarButton
+ * appearance/behaviour according to various config flags such as:
+ * CDockManager::DockAreaHas_xxx_Button - if set to 'false' keeps the button
+ * always invisible CDockManager::DockAreaHideDisabledButtons - if set to 'true'
+ * hides button when it is disabled
+ */
+class CTitleBarButton : public tTitleBarButton
+{
+    Q_OBJECT
+private:
+    bool ShowInTitleBar = true;
+    bool HideWhenDisabled = false;
+    TitleBarButton TitleBarButtonId;
 
-	protected:
-		/**
-	 * Stores mouse position to detect dragging
-	 */
-		virtual void mousePressEvent(QMouseEvent* ev) override;
+public:
+    using Super = tTitleBarButton;
+    CTitleBarButton(bool ShowInTitleBar, bool HideWhenDisabled,
+                    TitleBarButton ButtonId, QWidget* parent = nullptr);
 
-		/**
-		 * Stores mouse position to detect dragging
-		 */
-		virtual void mouseReleaseEvent(QMouseEvent* ev) override;
+    /**
+     * Adjust this visibility change request with our internal settings:
+     */
+    virtual void setVisible(bool visible) override;
 
-		/**
-		 * Starts floating the complete docking area including all dock widgets,
-		 * if it is not the last dock area in a floating widget
-		 */
-		virtual void mouseMoveEvent(QMouseEvent* ev) override;
+    /**
+     * Configures, if the title bar button should be shown in title bar
+     */
+    void setShowInTitleBar(bool Show);
 
-		/**
-		 * Double clicking the title bar also starts floating of the complete area
-		 */
-		virtual void mouseDoubleClickEvent(QMouseEvent* event) override;
+    /**
+     * Identifier for the title bar button
+     */
+    TitleBarButton buttonId() const { return TitleBarButtonId; }
 
-		/**
-		 * Show context menu
-		 */
-		virtual void contextMenuEvent(QContextMenuEvent* event) override;
+    /**
+     * Return the title bar that contains this button
+     */
+    CDockAreaTitleBar* titleBar() const;
 
-	public Q_SLOTS:
-		/**
-		 * Call this slot to tell the title bar that it should update the tabs menu
-		 * the next time it is shown.
-		 */
-		void markTabsMenuOutdated();
+    /**
+     * Returns true, if the button is in a title bar in an auto hide area
+     */
+    bool isInAutoHideArea() const;
 
+protected:
+    /**
+     * Handle EnabledChanged signal to set button invisible if the configured
+     */
+    bool event(QEvent* ev) override;
+};
 
-	public:
-		using Super = QFrame;
+/**
+ * Title bar of a dock area.
+ * The title bar contains a tabbar with all tabs for a dock widget group and
+ * with a tabs menu button, a undock button and a close button.
+ */
+class ADS_EXPORT CDockAreaTitleBar : public QFrame
+{
+    Q_PROPERTY(bool focused READ isFocused)
+    Q_OBJECT
+private:
+    DockAreaTitleBarPrivate* d;  ///< private data (pimpl)
+    friend struct DockAreaTitleBarPrivate;
 
-		/**
-		 * Default Constructor
-		 */
-		CDockAreaTitleBar(CDockAreaWidget* parent);
+private Q_SLOTS:
+    void onTabsMenuAboutToShow();
+    void onCloseButtonClicked();
+    void onAutoHideCloseActionTriggered();
+    void minimizeAutoHideContainer();
+    void onUndockButtonClicked();
+    void onTabsMenuActionTriggered(QAction* Action);
+    void onCurrentTabChanged(int Index);
+    void onAddButtonClicked(bool checked = false);
+    void onAutoHideButtonClicked();
+    void onAutoHideDockAreaActionClicked();
+    void onAutoHideToActionClicked();
 
-		/**
-		 * Virtual Destructor
-		 */
-		virtual ~CDockAreaTitleBar();
+protected:
+    /**
+     * Stores mouse position to detect dragging
+     */
+    virtual void mousePressEvent(QMouseEvent* ev) override;
 
-		/**
-		 * Returns the pointer to the tabBar()
-		 */
-		CDockAreaTabBar* tabBar() const;
+    /**
+     * Stores mouse position to detect dragging
+     */
+    virtual void mouseReleaseEvent(QMouseEvent* ev) override;
 
-		/**
-		 * Returns the button corresponding to the given title bar button identifier
-		 */
-		QAbstractButton* button(TitleBarButton which) const;
+    /**
+     * Starts floating the complete docking area including all dock widgets,
+     * if it is not the last dock area in a floating widget
+     */
+    virtual void mouseMoveEvent(QMouseEvent* ev) override;
 
-		/**
-		 * Updates the visibility of the dock widget actions in the title bar
-		 */
-		void updateDockWidgetActionsButtons();
+    /**
+     * Double clicking the title bar also starts floating of the complete area
+     */
+    virtual void mouseDoubleClickEvent(QMouseEvent* event) override;
 
-		/**
-		 * Marks the tabs menu outdated before it calls its base class
-		 * implementation
-		 */
-		virtual void setVisible(bool Visible) override;
+    /**
+     * Show context menu
+     */
+    virtual void contextMenuEvent(QContextMenuEvent* event) override;
 
-		/**
-		 * Inserts a custom widget at position index into this title bar.
-		 * If index is negative, the widget is added at the end.
-		 * You can use this function to insert custom widgets into the title bar.
-		 */
-		void insertWidget(int index, QWidget* widget);
+public Q_SLOTS:
+    /**
+     * Call this slot to tell the title bar that it should update the tabs menu
+     * the next time it is shown.
+     */
+    void markTabsMenuOutdated();
 
-		/**
-		 * Searches for widget widget in this title bar.
-		 * You can use this function, to get the position of the default
-		 * widget in the tile bar.
-		 * \code
-		 * int tabBarIndex = TitleBar->indexOf(TitleBar->tabBar());
-		 * int closeButtonIndex = TitleBar->indexOf(TitleBar->button(TitleBarButtonClose));
-		 * \endcode
-		 */
-		int indexOf(QWidget* widget) const;
+public:
+    using Super = QFrame;
 
-		/**
-		 * Returns true if the titlebar's dock area has focus
-		 */
-		bool isFocused() const;
+    /**
+     * Default Constructor
+     */
+    CDockAreaTitleBar(CDockAreaWidget* parent);
 
-	Q_SIGNALS:
-		/**
-		 * This signal is emitted if a tab in the tab bar is clicked by the user
-		 * or if the user clicks on a tab item in the title bar tab menu.
-		 */
-		void tabBarClicked(int index);
-	}; // class name
+    /**
+     * Virtual Destructor
+     */
+    virtual ~CDockAreaTitleBar();
 
-}
+    /**
+     * Returns the pointer to the tabBar()
+     */
+    CDockAreaTabBar* tabBar() const;
+
+    /**
+     * Returns the button corresponding to the given title bar button identifier
+     */
+    CTitleBarButton* button(TitleBarButton which) const;
+
+    /**
+     * Returns the auto hide title label, used when the dock area is expanded and
+     * auto hidden
+     */
+    CElidingLabel* autoHideTitleLabel() const;
+
+    /**
+     * Returns the dock area widget that contains this title bar
+     */
+    CDockAreaWidget* dockAreaWidget() const;
+
+    /**
+     * Updates the visibility of the dock widget actions in the title bar
+     */
+    void updateDockWidgetActionsButtons();
+
+    /**
+     * Marks the tabs menu outdated before it calls its base class
+     * implementation
+     */
+    virtual void setVisible(bool Visible) override;
+
+    /**
+     * Inserts a custom widget at position index into this title bar.
+     * If index is negative, the widget is added at the end.
+     * You can use this function to insert custom widgets into the title bar.
+     */
+    void insertWidget(int index, QWidget* widget);
+
+    /**
+     * Searches for widget widget in this title bar.
+     * You can use this function, to get the position of the default
+     * widget in the tile bar.
+     * \code
+     * int tabBarIndex = TitleBar->indexOf(TitleBar->tabBar());
+     * int closeButtonIndex =
+     * TitleBar->indexOf(TitleBar->button(TitleBarButtonClose)); \endcode
+     */
+    int indexOf(QWidget* widget) const;
+
+    /**
+     * Returns true if the titlebar's dock area has focus
+     */
+    bool isFocused() const;
+
+    /**
+     * Close group tool tip based on the current state
+     * Auto hide widgets can only have one dock widget so it does not make sense
+     * for the tooltip to show close group
+     */
+    QString titleBarButtonToolTip(TitleBarButton Button) const;
+
+    /**
+     * Moves the dock area into its own floating widget if the area
+     * DockWidgetFloatable flag is true
+     */
+    void setAreaFloating();
+
+    /**
+     * Call this function, to create all the required auto hide controls
+     */
+    void showAutoHideControls(bool Show);
+
+    /**
+     * Returns true, if the auto hide controls are visible
+     */
+    bool isAutoHide() const;
+
+Q_SIGNALS:
+    /**
+     * This signal is emitted if a tab in the tab bar is clicked by the user
+     * or if the user clicks on a tab item in the title bar tab menu.
+     */
+    void tabBarClicked(int index);
+};  // class name
+
+}  // namespace ads
 // namespace ads
 //-----------------------------------------------------------------------------
-#endif // DockAreaTitleBarH
+#endif  // DockAreaTitleBarH
