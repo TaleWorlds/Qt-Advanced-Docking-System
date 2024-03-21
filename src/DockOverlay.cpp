@@ -117,12 +117,12 @@ struct DockOverlayCrossPrivate
         switch (ColorIndex)
         {
         case CDockOverlayCross::FrameColor:
-            return pal.color(QPalette::Active, QPalette::Highlight);
+            return pal.color(QPalette::Active, QPalette::Window);
         case CDockOverlayCross::WindowBackgroundColor:
             return pal.color(QPalette::Active, QPalette::Base);
         case CDockOverlayCross::OverlayColor:
         {
-            QColor Color = pal.color(QPalette::Active, QPalette::Highlight);
+            QColor Color = pal.color(QPalette::Active, QPalette::Window);
             Color.setAlpha(64);
             return Color;
         }
@@ -630,7 +630,7 @@ void CDockOverlay::paintEvent(QPaintEvent* event)
     }
 
     QPainter painter(this);
-    QColor Color = palette().color(QPalette::Active, QPalette::Highlight);
+    QColor Color = palette().color(QPalette::Active, QPalette::Window);
     QPen Pen = painter.pen();
     Pen.setColor(Color.darker(120));
     Pen.setStyle(Qt::SolidLine);
