@@ -179,20 +179,9 @@ void DockAreaTitleBarPrivate::createButtons()
     AddButton->setSizePolicy(ButtonSizePolicy);
     AddButton->setIconSize({15, 15});
     internal::setToolTip(AddButton, QObject::tr("New Tab"));
-
-    // Widget for button
-    QWidget* AddButtonWidget = new QWidget(_this);
-    QBoxLayout* AddButtonLayout =
-        new QBoxLayout(QBoxLayout::LeftToRight, AddButtonWidget);
-    AddButtonLayout->setContentsMargins(0, 0, 0, 0);
-    AddButtonLayout->addWidget(AddButton);
-    AddButtonWidget->setLayout(AddButtonLayout);
-    Layout->addWidget(AddButtonWidget, 0);
+    Layout->addWidget(AddButton, 0);
     QObject::connect(AddButton, &QToolButton::clicked, _this,
                      &CDockAreaTitleBar::onAddButtonClicked);
-
-    // Spacer
-    Layout->addWidget(new CSpacerWidget(_this));
 
     // Tabs menu button
     TabsMenuButton = new CTitleBarButton(
@@ -290,7 +279,14 @@ void DockAreaTitleBarPrivate::createAutoHideTitleLabel()
     // At position 0 is the tab bar - insert behind tab bar
     Layout->insertWidget(1, AutoHideTitleLabel);
     AutoHideTitleLabel->setVisible(false);  // Default hidden
-    Layout->insertWidget(2, new CSpacerWidget(_this));
+    if (AddButton)
+    {
+        Layout->insertWidget(3, new CSpacerWidget(_this));
+    }
+    else
+    {
+        Layout->insertWidget(2, new CSpacerWidget(_this));
+    }
 }
 
 //============================================================================

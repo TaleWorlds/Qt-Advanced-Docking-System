@@ -1239,6 +1239,7 @@ bool DockContainerWidgetPrivate::restoreSideBar(CDockingStateReader& s,
         }
         AutoHideContainer->setSize(Size);
         DockWidget->setProperty(internal::ClosedProperty, Closed);
+        AutoHideContainer->collapseView(true);
         DockWidget->setProperty(internal::DirtyProperty, false);
     }
 

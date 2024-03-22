@@ -35,7 +35,7 @@ struct ResizeHandlePrivate
     int MaxSize = 1;
     QPointer<QRubberBand> RubberBand;
     bool OpaqueResize = false;
-    int HandleWidth = 2;
+    int HandleWidth = 6;
 
     /**
      * Private data constructor
