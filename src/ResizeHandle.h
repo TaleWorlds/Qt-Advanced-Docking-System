@@ -34,6 +34,7 @@ protected:
     void mouseMoveEvent(QMouseEvent*) override;
     void mousePressEvent(QMouseEvent*) override;
     void mouseReleaseEvent(QMouseEvent*) override;
+    bool eventFilter(QObject* receiver, QEvent* event) override;
 
 public:
     using Super = QFrame;

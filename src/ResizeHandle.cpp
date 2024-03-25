@@ -10,6 +10,7 @@
 //============================================================================
 #include "ResizeHandle.h"
 
+#include <QApplication>
 #include <QDebug>
 #include <QMouseEvent>
 #include <QPointer>
@@ -17,6 +18,8 @@
 #include <QStyle>
 #include <QStyleOption>
 
+#include "AutoHideDockContainer.h"
+#include "DockContainerWidget.h"
 #include "ads_globals.h"
 
 namespace ads
@@ -36,6 +39,7 @@ struct ResizeHandlePrivate
     QPointer<QRubberBand> RubberBand;
     bool OpaqueResize = false;
     int HandleWidth = 6;
+    bool HasOverrideCursor = false;
 
     /**
      * Private data constructor
@@ -62,8 +66,11 @@ struct ResizeHandlePrivate
 
     /**
      * Calculates the resize position and geometry
+     * returns the new geometry relative to the old geometry.
      */
-    void doResizing(QMouseEvent* e, bool ForceResize = false);
+    QRect doResizing(QMouseEvent* e, bool ForceResize = false);
+
+    QRect newGeometry(QMouseEvent* e, int& outRubberBandPos);
 };
 // struct ResizeHandlePrivate
 
@@ -95,7 +102,34 @@ void ResizeHandlePrivate::setRubberBand(int Pos)
 }
 
 //============================================================================
-void ResizeHandlePrivate::doResizing(QMouseEvent* e, bool ForceResize)
+QRect ResizeHandlePrivate::doResizing(QMouseEvent* e, bool ForceResize)
+{
+    auto OldGeometry = Target->geometry();
+    int pos = 0;
+    auto NewGeometry = newGeometry(e, pos);
+    auto RetGeometry = NewGeometry;
+    if (HandlePosition & Qt::TopEdge || HandlePosition & Qt::LeftEdge)
+    {
+        QSize DeltaSize = OldGeometry.size() - NewGeometry.size();
+        NewGeometry.moveTo(OldGeometry.topLeft()
+                           + QPoint(DeltaSize.width(), DeltaSize.height()));
+    }
+    else
+    {
+        NewGeometry.moveTo(OldGeometry.topLeft());
+    }
+    if (_this->opaqueResize() || ForceResize)
+    {
+        Target->setGeometry(NewGeometry);
+    }
+    else
+    {
+        setRubberBand(pos);
+    }
+    return RetGeometry;
+}
+
+QRect ResizeHandlePrivate::newGeometry(QMouseEvent* e, int& outRubberBandPos)
 {
     int pos = pick(e->pos()) - MouseOffset;
     auto OldGeometry = Target->geometry();
@@ -140,15 +174,17 @@ void ResizeHandlePrivate::doResizing(QMouseEvent* e, bool ForceResize)
     }
     break;
     }
-
-    if (_this->opaqueResize() || ForceResize)
+    if (HandlePosition & Qt::TopEdge || HandlePosition & Qt::LeftEdge)
     {
-        Target->setGeometry(NewGeometry);
+        QSize DeltaSize = OldGeometry.size() - NewGeometry.size();
+        NewGeometry.moveTo(DeltaSize.width(), DeltaSize.height());
     }
     else
     {
-        setRubberBand(pos);
+        NewGeometry.moveTo(0, 0);
     }
+    outRubberBandPos = pos;
+    return NewGeometry;
 }
 
 //============================================================================
@@ -158,6 +194,7 @@ CResizeHandle::CResizeHandle(Qt::Edge HandlePosition, QWidget* parent)
     d->Target = parent;
     setMinResizeSize(48);
     setHandlePosition(HandlePosition);
+    qApp->installEventFilter(this);
 }
 
 //============================================================================
@@ -169,12 +206,10 @@ CResizeHandle::~CResizeHandle()
 //============================================================================
 void CResizeHandle::mouseMoveEvent(QMouseEvent* e)
 {
-    if (!(e->buttons() & Qt::LeftButton))
+    if (e->buttons() & Qt::LeftButton)
     {
-        return;
+        d->doResizing(e);
     }
-
-    d->doResizing(e);
 }
 
 //============================================================================
@@ -191,6 +226,27 @@ void CResizeHandle::mousePressEvent(QMouseEvent* e)
 //============================================================================
 void CResizeHandle::mouseReleaseEvent(QMouseEvent* e)
 {
+    if (e->button() == Qt::LeftButton)
+    {
+        int unused;
+        QRect NewGeo = d->newGeometry(e, unused);
+        if (orientation() == Qt::Horizontal)
+        {
+            NewGeo.setWidth(d->HandleWidth);
+        }
+        else
+        {
+            NewGeo.setHeight(d->HandleWidth);
+        }
+        QPoint p_ = e->globalPosition().toPoint();
+        CAutoHideDockContainer* ahdc =
+            qobject_cast<CAutoHideDockContainer*>(d->Target);
+        if (d->HasOverrideCursor && !NewGeo.contains(ahdc->mapFromGlobal(p_)))
+        {
+            QApplication::restoreOverrideCursor();
+            d->HasOverrideCursor = false;
+        }
+    }
     if (!opaqueResize() && e->button() == Qt::LeftButton)
     {
         if (d->RubberBand)
@@ -207,17 +263,46 @@ void CResizeHandle::mouseReleaseEvent(QMouseEvent* e)
 }
 
 //============================================================================
+bool CResizeHandle::eventFilter(QObject* receiver, QEvent* event)
+{
+    if (d->Target->isVisible())
+    {
+        if (event->type() == QEvent::Type::MouseMove)
+        {
+            CAutoHideDockContainer* ahdc =
+                qobject_cast<CAutoHideDockContainer*>(d->Target);
+            QMouseEvent* me = (QMouseEvent*)event;
+            if (!d->HasOverrideCursor && (me->buttons() == Qt::NoButton)
+                && rect().contains(mapFromGlobal(me->globalPosition().toPoint())))
+            {
+                Qt::CursorShape s = Qt::CursorShape::ArrowCursor;
+                switch (d->HandlePosition)
+                {
+                case Qt::LeftEdge:  // fall through
+                case Qt::RightEdge: s = Qt::SizeHorCursor; break;
+
+                case Qt::TopEdge:  // fall through
+                case Qt::BottomEdge: s = Qt::SizeVerCursor; break;
+                }
+                QApplication::setOverrideCursor(s);
+                d->HasOverrideCursor = true;
+            }
+            else if (d->HasOverrideCursor && !(me->buttons() & Qt::LeftButton)
+                     && !rect().contains(
+                         mapFromGlobal(me->globalPosition().toPoint())))
+            {
+                QApplication::restoreOverrideCursor();
+                d->HasOverrideCursor = false;
+            }
+        }
+    }
+    return false;
+}
+
+//============================================================================
 void CResizeHandle::setHandlePosition(Qt::Edge HandlePosition)
 {
     d->HandlePosition = HandlePosition;
-    switch (d->HandlePosition)
-    {
-    case Qt::LeftEdge:  // fall through
-    case Qt::RightEdge: setCursor(Qt::SizeHorCursor); break;
-
-    case Qt::TopEdge:  // fall through
-    case Qt::BottomEdge: setCursor(Qt::SizeVerCursor); break;
-    }
 
     setMaxResizeSize(d->isHorizontal() ? parentWidget()->height() :
                                          parentWidget()->width());
@@ -287,7 +372,8 @@ void CResizeHandle::setMinResizeSize(int MinSize)
 //============================================================================
 void CResizeHandle::setMaxResizeSize(int MaxSize)
 {
-    d->MaxSize = MaxSize;
+    d->MaxSize = MaxSize >= d->MinSize ? MaxSize : d->MinSize;
+    Q_ASSERT(d->MaxSize > 0 && d->MaxSize >= d->MinSize);
 }
 
 //============================================================================
