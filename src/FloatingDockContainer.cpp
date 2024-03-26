@@ -925,15 +925,19 @@ CFloatingDockContainer* CFloatingDockContainer::moveContainerAndDelete()
          j++)
     {
         auto DA = d->DockContainer->dockArea(j);
-        for (int i = 0; DA && i < DA->dockWidgetsCount(); i++)
+        if (DA)
         {
-            auto DW = DA->dockWidget(i);
-            if (DW)
+            for (int i = 0; DA && i < DA->dockWidgetsCount(); i++)
             {
-                open_map[DW] = DW->toggleViewAction()->isChecked();
+                auto DW = DA->dockWidget(i);
+                if (DW)
+                {
+                    open_map[DW] = DW->toggleViewAction()->isChecked();
+                }
             }
         }
     }
+
     CFloatingDockContainer* RestoredFloatingWidget = new CFloatingDockContainer(
         d->DockManager, d->DockContainer->hasIndependentWidget());
     QByteArray containerData;

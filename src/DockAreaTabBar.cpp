@@ -33,6 +33,7 @@
 #include <QDebug>
 #include <QMouseEvent>
 #include <QScrollBar>
+#include <QSet>
 #include <QTimer>
 #include <QtGlobal>
 
@@ -58,6 +59,8 @@ struct DockAreaTabBarPrivate
     QWidget* TabsContainerWidget;
     QBoxLayout* TabsLayout;
     int CurrentIndex = -1;
+    static QSet<CDockWidgetTab*> TempTabWidgets;
+    QSet<CDockWidgetTab*> TempTabWidget = {};
 
     /**
      * Private data constructor
@@ -81,6 +84,7 @@ struct DockAreaTabBarPrivate
     CDockWidgetTab* lastTab() const { return _this->tab(_this->count() - 1); }
 };
 // struct DockAreaTabBarPrivate
+QSet<CDockWidgetTab*> DockAreaTabBarPrivate::TempTabWidgets = {};
 
 //============================================================================
 DockAreaTabBarPrivate::DockAreaTabBarPrivate(CDockAreaTabBar* _public)
@@ -103,8 +107,17 @@ void DockAreaTabBarPrivate::updateTabs()
         {
             TabWidget->show();
             TabWidget->setActiveTab(true);
-            QTimer::singleShot(0, TabWidget, [&, TabWidget] {
-                _this->ensureWidgetVisible(TabWidget);
+            TempTabWidgets.insert(TabWidget);
+            TempTabWidget.insert(TabWidget);
+            QTimer::singleShot(0, TabWidget, [this] {
+                for (auto TempTabWidget : TempTabWidgets)
+                {
+                    if (TempTabWidget)
+                    {
+                        _this->ensureWidgetVisible(TempTabWidget);
+                    }
+                }
+                TempTabWidgets.clear();
             });
         }
         else
@@ -142,6 +155,7 @@ CDockAreaTabBar::CDockAreaTabBar(CDockAreaWidget* parent)
 //============================================================================
 CDockAreaTabBar::~CDockAreaTabBar()
 {
+    onTabBarAboutToBeDeleted();
     delete d;
 }
 
@@ -406,6 +420,20 @@ void CDockAreaTabBar::onTabWidgetMoved(const QPoint& GlobalPos)
         // Ensure that the moved tab is reset to its start position
         d->TabsLayout->update();
     }
+}
+
+void CDockAreaTabBar::onTabBarAboutToBeDeleted()
+{
+    for (auto TTabWidg : d->TempTabWidget)
+    {
+        if (DockAreaTabBarPrivate::TempTabWidgets.constFind(TTabWidg)
+            != DockAreaTabBarPrivate::TempTabWidgets.constEnd())
+        {
+            DockAreaTabBarPrivate::TempTabWidgets.erase(
+                DockAreaTabBarPrivate::TempTabWidgets.constFind(TTabWidg));
+        }
+    }
+    d->TempTabWidget.clear();
 }
 
 //===========================================================================

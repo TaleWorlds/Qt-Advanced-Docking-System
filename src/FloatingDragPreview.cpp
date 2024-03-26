@@ -507,10 +507,9 @@ void CFloatingDragPreview::finishDragging()
     {
         // Check if the independence of this floating container changed by this
         // drop
-        bool target_has_independent =
+        bool targetHasIndependent =
             d->DropContainer ? d->DropContainer->hasIndependentWidget() : false;
-        ;
-        if (target_has_independent != target_had_independent)
+        if (targetHasIndependent != target_had_independent)
         {
             CFloatingDockContainer* RestoredFloatingWidget =
                 DropFloatingContainer->moveContainerAndDelete();
@@ -525,9 +524,9 @@ void CFloatingDragPreview::finishDragging()
                                                                // itself
     )
     {
-        bool source_has_independent =
+        bool sourceHasIndependent =
             SourceContainer ? SourceContainer->hasIndependentWidget() : false;
-        if (source_has_independent != source_had_independent)
+        if (sourceHasIndependent != source_had_independent)
         {
             if (SourceFloatingContainer->dockContainer() == SourceContainer)
             {
