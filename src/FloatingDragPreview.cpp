@@ -13,7 +13,10 @@
 #include <QApplication>
 #include <QEvent>
 #include <QKeyEvent>
+#include <QMainWindow>
 #include <QPainter>
+#include <QTimer>
+#include <QWindow>
 
 #include <AutoHideDockContainer.h>
 
@@ -26,7 +29,9 @@
 #include "DockOverlay.h"
 #include "DockWidget.h"
 #include "ads_globals.h"
-
+#ifdef Q_OS_WINDOWS
+#    include "Windows.h"
+#endif
 namespace ads
 {
 
@@ -210,16 +215,14 @@ void FloatingDragPreviewPrivate::updateDropOverlays(const QPoint& GlobalPos)
         VisibleDockAreas++;
     }
     DockWidgetAreas AllowedContainerAreas =
-        (VisibleDockAreas > 1) ? OuterDockAreas : AllDockAreas;
+        (VisibleDockAreas > 1) ? OuterDockAreas : CenterDockWidgetArea;
     auto DockArea = TopContainer->dockAreaAt(GlobalPos);
     // If the dock container contains only one single DockArea, then we need
     // to respect the allowed areas - only the center area is relevant here
     // because all other allowed areas are from the container
     if (VisibleDockAreas == 1 && DockArea)
     {
-        AllowedContainerAreas.setFlag(
-            CenterDockWidgetArea,
-            DockArea->allowedAreas().testFlag(CenterDockWidgetArea));
+        AllowedContainerAreas.setFlag(CenterDockWidgetArea, false);
     }
     if (isContentPinnable())
     {
@@ -234,9 +237,7 @@ void FloatingDragPreviewPrivate::updateDropOverlays(const QPoint& GlobalPos)
         && DockArea != ContentSourceArea)
     {
         DockAreaOverlay->enableDropPreview(true);
-        DockAreaOverlay->setAllowedAreas((VisibleDockAreas == 1) ?
-                                             NoDockWidgetArea :
-                                             DockArea->allowedAreas());
+        DockAreaOverlay->setAllowedAreas(DockArea->allowedAreas());
         DockWidgetArea Area = DockAreaOverlay->showOverlay(DockArea);
         DAWArea = Area;
         _this->activateWindow();
@@ -325,6 +326,9 @@ void FloatingDragPreviewPrivate::createFloatingWidget()
             FixedGeometry.adjust(0, FrameHeight, 0, 0);
             FloatingWidget->setGeometry(FixedGeometry);
         }
+        QTimer::singleShot(100, FloatingWidget, [FloatingWidget]() {
+            FloatingWidget->activateWindow();
+        });
     }
 }
 
@@ -490,6 +494,7 @@ void CFloatingDragPreview::finishDragging()
         SourceContainer->fetchIndependentCount();
     if (d->DropContainer)
         d->DropContainer->fetchIndependentCount();
+    bool aboutToDeleteOriginal = false;
     auto dockManager_ = d->DockManager;
     // Case - Existing Floating Drop Container is just changed
     auto SourceFloatingContainer =
@@ -513,6 +518,12 @@ void CFloatingDragPreview::finishDragging()
         {
             CFloatingDockContainer* RestoredFloatingWidget =
                 DropFloatingContainer->moveContainerAndDelete();
+            RestoredFloatingWidget->setUpdatesEnabled(true);
+            QTimer::singleShot(100, RestoredFloatingWidget,
+                               [RestoredFloatingWidget]() {
+                                   RestoredFloatingWidget->activateWindow();
+                               });
+            aboutToDeleteOriginal = true;
         }
     }
     bool deleted = false;
@@ -543,7 +554,10 @@ void CFloatingDragPreview::finishDragging()
             }
         }
     }
-    close();
+    if (!aboutToDeleteOriginal)
+    {
+        close();
+    }
     if (containerOverlay)
         containerOverlay->hideOverlay();
     if (dockAreaOverlay)
@@ -618,7 +632,15 @@ void CFloatingDragPreview::paintEvent(QPaintEvent* event)
 //============================================================================
 void CFloatingDragPreview::onApplicationStateChanged(Qt::ApplicationState state)
 {
-    if (state != Qt::ApplicationActive)
+    bool isAppActive = false;
+#ifdef Q_OS_WINDOWS
+    for (auto topLevel : QApplication::topLevelWindows())
+    {
+        bool isWindowActive = (HWND)topLevel->winId() == ::GetForegroundWindow();
+        isAppActive |= isWindowActive;
+    }
+#endif
+    if (state != Qt::ApplicationActive && !isAppActive)
     {
         disconnect(qApp, SIGNAL(applicationStateChanged(Qt::ApplicationState)),
                    this, SLOT(onApplicationStateChanged(Qt::ApplicationState)));

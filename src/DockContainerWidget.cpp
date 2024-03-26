@@ -1823,13 +1823,12 @@ void CDockContainerWidget::dropFloatingWidget(
         DockAreaOverlay = FloatingWidget->dockAreaOverlay();
     }
     auto dropArea = InvalidDockWidgetArea;
-    auto ContainerDropArea =
-        d->DockManager->containerOverlay()->dropAreaUnderCursor();
+    auto ContainerDropArea = ContainerOverlay->dropAreaUnderCursor();
     bool Dropped = false;
     // mouse is over dock area
     if (DockArea)
     {
-        auto dropOverlay = d->DockManager->dockAreaOverlay();
+        auto dropOverlay = DockAreaOverlay;
         dropOverlay->setAllowedAreas(DockArea->allowedAreas());
         dropArea = dropOverlay->showOverlay(DockArea);
         if (ContainerDropArea != InvalidDockWidgetArea
@@ -1841,8 +1840,7 @@ void CDockContainerWidget::dropFloatingWidget(
         if (dropArea != InvalidDockWidgetArea)
         {
             ADS_PRINT("Dock Area Drop Content: " << dropArea);
-            int TabIndex =
-                d->DockManager->dockAreaOverlay()->tabIndexUnderCursor();
+            int TabIndex = DockAreaOverlay->tabIndexUnderCursor();
             d->dropIntoSection(FloatingWidget, DockArea, dropArea, TabIndex);
             Dropped = true;
         }

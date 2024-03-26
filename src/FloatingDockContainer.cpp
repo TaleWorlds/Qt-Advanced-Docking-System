@@ -41,6 +41,7 @@
 #include <QSplitter>
 #include <QStatusBar>
 #include <QTime>
+#include <QTimer>
 #include <QWindow>
 #include <QXmlStreamWriter>
 
@@ -579,6 +580,11 @@ void FloatingDockContainerPrivate::titleMouseReleaseEvent()
             {
                 CFloatingDockContainer* RestoredFloatingWidget =
                     DropFloatingContainer->moveContainerAndDelete();
+                RestoredFloatingWidget->setUpdatesEnabled(true);
+                QTimer::singleShot(100, RestoredFloatingWidget,
+                                   [RestoredFloatingWidget]() {
+                                       RestoredFloatingWidget->activateWindow();
+                                   });
             }
         }
     }
@@ -643,16 +649,16 @@ void FloatingDockContainerPrivate::updateDropOverlays(const QPoint& GlobalPos)
 
     int VisibleDockAreas = TopContainer->visibleDockAreaCount();
     DockWidgetAreas AllowedContainerAreas =
-        (VisibleDockAreas > 1) ? OuterDockAreas : AllDockAreas;
+        (VisibleDockAreas > 1) ? OuterDockAreas : CenterDockWidgetArea;
     auto DockArea = TopContainer->dockAreaAt(GlobalPos);
     // If the dock container contains only one single DockArea, then we need
     // to respect the allowed areas - only the center area is relevant here
-    // because all other allowed areas are from the container
+    // because all other allowed areas are from the dock area
     if (VisibleDockAreas == 1 && DockArea)
     {
         AllowedContainerAreas.setFlag(
             CenterDockWidgetArea,
-            DockArea->allowedAreas().testFlag(CenterDockWidgetArea));
+            false);
     }
 
     if (DockContainer->features().testFlag(CDockWidget::DockWidgetPinnable))
@@ -668,9 +674,7 @@ void FloatingDockContainerPrivate::updateDropOverlays(const QPoint& GlobalPos)
     if (DockArea && DockArea->isVisible() && VisibleDockAreas > 0)
     {
         DockAreaOverlay->enableDropPreview(true);
-        DockAreaOverlay->setAllowedAreas((VisibleDockAreas == 1) ?
-                                             NoDockWidgetArea :
-                                             DockArea->allowedAreas());
+        DockAreaOverlay->setAllowedAreas(DockArea->allowedAreas());
         DockWidgetArea Area = DockAreaOverlay->showOverlay(DockArea);
         _this->activateWindow();
         // A CenterDockWidgetArea for the dockAreaOverlay() indicates that
@@ -964,6 +968,7 @@ CFloatingDockContainer* CFloatingDockContainer::moveContainerAndDelete()
         DA->setVisible(true);
         for (int i = 0; i < DA->dockWidgetsCount(); i++)
         {
+            DA->parentSplitter()->setVisible(true);
             auto DW = DA->dockWidget(i);
             if (DW && open_map[DW])
             {

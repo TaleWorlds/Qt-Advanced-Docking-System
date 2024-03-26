@@ -38,7 +38,9 @@ CMainWindow::CMainWindow(QWidget* parent)
 	CDockManager::setConfigFlag(CDockManager::FloatingShadowEnabled, false);
 	// only need this for removing native title bar - this demo also tests styling from stylesheet for the title bar
 	CDockManager::setConfigFlag(CDockManager::FloatingContainerForceQWidgetCustomStyledTitleBar, true);
-	CDockManager::setConfigFlag(CDockManager::FloatingContainerForceNativeTitleBar, false);
+    CDockManager::setConfigFlag(
+        CDockManager::FloatingContainerForceNativeTitleBar, false);
+    CDockManager::setAutoHideConfigFlags(CDockManager::DefaultAutoHideConfig);
 	DockManager = new CDockManager(this);
 	// Set central widget
 	QPlainTextEdit* w = new QPlainTextEdit();
