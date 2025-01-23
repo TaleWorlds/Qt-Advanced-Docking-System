@@ -43,6 +43,7 @@
 #include "DockAreaWidget.h"
 #include "DockComponentsFactory.h"
 #include "DockManager.h"
+#include "DockSplitter.h"
 #include "ResizeHandle.h"
 
 namespace ads
@@ -182,6 +183,8 @@ CAutoHideDockContainer::CAutoHideDockContainer(CDockWidget* DockWidget,
                                                CDockContainerWidget* parent)
     : Super(parent), d(new AutoHideDockContainerPrivate(this))
 {
+    // QT_ADS: temp fix, remove it on merge
+	setWindowFlag(Qt::SubWindow, true);
     hide();  // auto hide dock container is initially always hidden
     d->SideTabBarArea = area;
     d->SideTab = componentsFactory()->createDockWidgetSideTab(nullptr);
@@ -192,7 +195,7 @@ CAutoHideDockContainer::CAutoHideDockContainer(CDockWidget* DockWidget,
     d->DockArea->setAutoHideDockContainer(this);
 
     setObjectName("autoHideDockContainer");
-
+    setAutoFillBackground(true);
     d->Layout = new QBoxLayout(isHorizontalArea(area) ? QBoxLayout::TopToBottom :
                                                         QBoxLayout::LeftToRight);
     d->Layout->setContentsMargins(0, 0, 0, 0);
@@ -292,6 +295,11 @@ CAutoHideDockContainer::~CAutoHideDockContainer()
     delete d;
 }
 
+void CAutoHideDockContainer::setVisible(bool v)
+{
+	Super::setVisible(v);
+}
+
 //============================================================================
 CAutoHideSideBar* CAutoHideDockContainer::autoHideSideBar() const
 {
@@ -382,14 +390,70 @@ CDockAreaWidget* CAutoHideDockContainer::dockAreaWidget() const
 //============================================================================
 void CAutoHideDockContainer::moveContentsToParent()
 {
+    int s = this->getSize();
+    auto orientation = this->orientation();
+    auto DockContainer = dockContainer();
+    auto sideBarLoc = sideBarLocation();
+    auto totalSize = orientation == Qt::Orientation::Horizontal ?
+                         DockContainer->size().height() :
+                         DockContainer->size().width();
     cleanupAndDelete();
     // If we unpin the auto hide dock widget, then we insert it into the same
     // location like it had as a auto hide widget.  This brings the least surprise
     // to the user and he does not have to search where the widget was inserted.
     d->DockWidget->setDockArea(nullptr);
-    auto DockContainer = dockContainer();
-    DockContainer->addDockWidget(d->getDockWidgetArea(d->SideTabBarArea),
-                                 d->DockWidget);
+    auto newDockArea = DockContainer->addDockWidget(
+        d->getDockWidgetArea(d->SideTabBarArea), d->DockWidget);
+    auto newDockAreaParentSplitter = newDockArea->parentSplitter();
+    if (newDockAreaParentSplitter)
+    {
+        auto newDAsizes = newDockAreaParentSplitter->sizes();
+        switch (sideBarLoc)
+        {
+        case ads::SideBarTop:
+        case ads::SideBarLeft:
+        {
+            if (newDAsizes.size() > 2)
+            {
+                *newDAsizes.begin() = s;
+                for (int i = 1; i < newDAsizes.size(); i++)
+                {
+                    float ratio = float(newDAsizes[i]) / float(totalSize);
+                    int newSize = qRound((totalSize - s) * ratio);
+                    newDAsizes[i] = newSize;
+                }
+                newDockAreaParentSplitter->setSizes(newDAsizes);
+			}
+            else if (newDAsizes.size() == 2)
+            {
+                newDockArea->parentSplitter()->setSizes({s, totalSize - s});
+            }
+
+        }
+        break;
+        case ads::SideBarRight:
+        case ads::SideBarBottom:
+        {
+            if (newDAsizes.size() > 2)
+            {
+                *(newDAsizes.end() - 1) = s;
+                for (int i = 0; i < newDAsizes.size() - 1; i++)
+                {
+                    float ratio = float(newDAsizes[i]) / float(totalSize);
+                    int newSize = qRound((totalSize - s) * ratio);
+                    newDAsizes[i] = newSize;
+                }
+                newDockAreaParentSplitter->setSizes(newDAsizes);
+            }
+            else if (newDAsizes.size() == 2)
+            {
+                newDockArea->parentSplitter()->setSizes({totalSize - s, s});
+            }
+        }
+        break;
+        default: break;
+        }
+    }
 }
 
 //============================================================================
@@ -486,6 +550,19 @@ void CAutoHideDockContainer::setSize(int Size)
 }
 
 //============================================================================
+int CAutoHideDockContainer::getSize() const
+{
+    if (d->isHorizontal())
+    {
+        return d->Size.height();
+    }
+    else
+    {
+        return d->Size.width();
+    }
+}
+
+//============================================================================
 /**
  * Returns true if the object given in ancestor is an ancestor of the object
  * given in descendant
@@ -569,8 +646,28 @@ bool CAutoHideDockContainer::eventFilter(QObject* watched, QEvent* event)
             return Super::eventFilter(watched, event);
         }
 
-        // user clicked into container - collapse the auto hide widget
+        // clicking into a sidebar should not close the auto hide widget
+        if (widget == d->SideTab->sideBar() || qobject_cast<CAutoHideSideBar*>(widget))
+		{
+			return Super::eventFilter(watched, event);
+        }
+        
+        // clicking into a different sidebar tab will also close this container
+        if (qobject_cast<CAutoHideTab*>(widget))
+        {
+			collapseView(true);
+			return Super::eventFilter(watched, event);
+        }
+
+        // otherwise, only clicking into a dock area should close it
+        for (auto dockAreaIn : dockContainer()->openedDockAreas())
+        {
+            if (isObjectOrAncestor(widget, dockAreaIn))
+            {
         collapseView(true);
+                return Super::eventFilter(watched, event);
+    }
+        }
     }
     else if (event->type() == internal::FloatingWidgetDragStartEvent)
     {
@@ -584,7 +681,14 @@ bool CAutoHideDockContainer::eventFilter(QObject* watched, QEvent* event)
     }
     else if (event->type() == internal::DockedWidgetDragStartEvent)
     {
+		internal::CFloatingWidgetDragStartEvent* cEvent = (internal::CFloatingWidgetDragStartEvent*)event;
+		// close the auto hide containers that are not this
+		// we cant close the current auto hide container because if we do
+		// then the title bar cant process mouse move events correctly
+		if (!objectIsAncestorOf(cEvent->content(), this))
+		{
         collapseView(true);
+    }
     }
 
     return Super::eventFilter(watched, event);

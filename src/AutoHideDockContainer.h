@@ -89,6 +89,8 @@ public:
      */
     virtual ~CAutoHideDockContainer();
 
+	void setVisible(bool v) override;
+
     /**
      * Gets the side tab bar
      */
@@ -170,6 +172,8 @@ public:
      * of this auto hide container.
      */
     void setSize(int Size);
+
+	int getSize() const;
 
     /**
      * Resets the width or height to the initial dock widget size dependinng on

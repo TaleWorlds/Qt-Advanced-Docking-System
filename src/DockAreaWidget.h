@@ -173,6 +173,8 @@ protected:
      */
     void updateTitleBarButtonVisibility(bool IsTopLevel) const;
 
+	virtual bool focusNextPrevChild(bool next) override;
+
 protected Q_SLOTS:
     void toggleView(bool Open);
 

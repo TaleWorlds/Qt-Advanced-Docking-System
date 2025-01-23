@@ -65,6 +65,7 @@ private:
 
 private Q_SLOTS:
     void onAutoHideToActionClicked();
+    void onCloseButtonClicked();
 
 protected:
     void setSideBar(CAutoHideSideBar* SideTabBar);
@@ -142,6 +143,8 @@ public:
      * Returns the index of this tab in the sideBar
      */
     int tabIndex() const;
+
+    virtual QSize sizeHint() const override;
 
 public Q_SLOTS:
     /**

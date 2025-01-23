@@ -326,6 +326,7 @@ void CDockAreaTabBar::onTabClicked()
     }
     setCurrentIndex(index);
     Q_EMIT tabBarClicked(index);
+	Tab->dockWidget()->setFocus(Qt::FocusReason::MouseFocusReason);
 }
 
 //===========================================================================
@@ -385,6 +386,11 @@ void CDockAreaTabBar::onTabWidgetMoved(const QPoint& GlobalPos)
     }
 
     int fromIndex = d->TabsLayout->indexOf(MovingTab);
+	if (fromIndex == -1 || d->TabsLayout->count() == 0)
+	{
+		Q_ASSERT_X(d->TabsLayout->count() != 0, "CDockAreaTabBar::onTabWidgetMoved", "Invalid tab widget move state!");
+		return;
+	}
     auto MousePos = mapFromGlobal(GlobalPos);
     MousePos.rx() = qMax(d->firstTab()->geometry().left(), MousePos.x());
     MousePos.rx() = qMin(d->lastTab()->geometry().right(), MousePos.x());

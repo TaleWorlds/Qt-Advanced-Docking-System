@@ -64,10 +64,10 @@ private Q_SLOTS:
     void onCloseOtherTabsRequested();
     void onTabWidgetMoved(const QPoint& GlobalPos);
 
-    /**
-     * Call this function before dropping and deleting a dock container
-     * with CFloatingDockContainer::moveContainerAndDelete()
-     */
+	/**
+	 * Call this function before dropping and deleting a dock container
+	 * with CFloatingDockContainer::moveContainerAndDelete()
+	 */
     void onTabBarAboutToBeDeleted();
 
 protected:

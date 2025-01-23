@@ -29,6 +29,7 @@
 #include "DockWidget.h"
 
 #include <QAction>
+#include <QApplication>
 #include <QBoxLayout>
 #include <QDebug>
 #include <QEvent>
@@ -49,6 +50,8 @@
 
 #include <iostream>
 
+#include "DockAreaTitleBar.h"
+#include "ElidingLabel.h"
 #include "DockAreaWidget.h"
 #include "DockComponentsFactory.h"
 #include "DockContainerWidget.h"
@@ -60,6 +63,7 @@
 
 namespace ads
 {
+
 /**
  * Private data class of CDockWidget class (pimpl)
  */
@@ -95,11 +99,14 @@ struct DockWidgetPrivate
     QPointer<CAutoHideTab> SideTabWidget;
     CDockWidget::eToolBarStyleSource ToolBarStyleSource =
         CDockWidget::ToolBarStyleFromDockManager;
+    QList<CDockWidget::CustomButtonData*> CustomButtons = {};
 
     /**
      * Private data constructor
      */
     DockWidgetPrivate(CDockWidget* _public);
+
+    ~DockWidgetPrivate();
 
     /**
      * Show dock widget
@@ -153,6 +160,16 @@ DockWidgetPrivate::DockWidgetPrivate(CDockWidget* _public) : _this(_public)
 {}
 
 //============================================================================
+DockWidgetPrivate::~DockWidgetPrivate()
+{
+    for (auto cd : CustomButtons)
+    {
+        delete cd;
+    }
+    CustomButtons.clear();
+}
+
+//============================================================================
 void DockWidgetPrivate::showDockWidget()
 {
     if (!Widget)
@@ -175,7 +192,11 @@ void DockWidgetPrivate::showDockWidget()
         // initial size
         FloatingWidget->resize(Widget ? Widget->sizeHint() : _this->sizeHint());
         TabWidget->show();
+        FloatingWidget->setUpdatesEnabled(false);
         FloatingWidget->show();
+        FloatingWidget->setUpdatesEnabled(true);
+		FloatingWidget->update();
+		FloatingWidget->layout()->update();
     }
     else
     {
@@ -194,7 +215,11 @@ void DockWidgetPrivate::showDockWidget()
         {
             CFloatingDockContainer* FloatingWidget =
                 internal::findParent<CFloatingDockContainer*>(Container);
+            FloatingWidget->setUpdatesEnabled(false);
             FloatingWidget->show();
+            FloatingWidget->setUpdatesEnabled(true);
+			FloatingWidget->update();
+			FloatingWidget->layout()->update();
         }
 
         // If this widget is pinned and there are no opened dock widgets, unpin
@@ -372,8 +397,13 @@ CDockWidget::CDockWidget(const QString& title, QWidget* parent)
 
     if (CDockManager::testConfigFlag(CDockManager::FocusHighlighting))
     {
-        setFocusPolicy(Qt::ClickFocus);
+        setFocusPolicy((Qt::FocusPolicy)(Qt::ClickFocus | Qt::TabFocus));
     }
+	else
+	{
+		setFocusPolicy(Qt::TabFocus);
+}
+	installEventFilter(this);
 }
 
 //============================================================================
@@ -825,10 +855,15 @@ bool CDockWidget::event(QEvent* e)
         {
             d->ToggleViewAction->setText(title);
         }
+        if (autoHideDockContainer() && d->DockArea->titleBar()->autoHideTitleLabel())
+        {
+            d->DockArea->titleBar()->autoHideTitleLabel()->setText(title);
+        }
         if (d->DockArea)
         {
             d->DockArea->markTitleBarMenuOutdated();  // update tabs menu
         }
+		
 
         auto FloatingWidget = floatingDockContainer();
         if (FloatingWidget)
@@ -1137,6 +1172,50 @@ bool CDockWidget::closeDockWidgetInternal(bool ForceClose)
     return true;
 }
 
+bool CDockWidget::eventFilter(QObject* watched, QEvent* event)
+{
+	if (watched == this && (event->type() == QEvent::KeyPress || event->type() == QEvent::ShortcutOverride))
+	{
+		QKeyEvent* keyEvent = (QKeyEvent*)event;
+		Qt::KeyboardModifiers mods = QApplication::queryKeyboardModifiers();
+		if (mods.testFlag(Qt::ControlModifier) && keyEvent->nativeVirtualKey() == 0x09)
+		{
+			if (dockAreaWidget()->openDockWidgetsCount() == 1)
+			{
+				return Super::eventFilter(watched, event);
+			}
+			int curIdx = dockAreaWidget()->currentIndex();
+			int dwCount = dockAreaWidget()->openDockWidgetsCount();
+			if (mods.testFlag(Qt::ShiftModifier) && event->type() == QEvent::ShortcutOverride) // go back
+			{
+				curIdx = (curIdx - 1 + dwCount) % dwCount;
+			}
+			else if (!mods.testFlag(Qt::ShiftModifier) && event->type() == QEvent::KeyPress) // go forward
+			{
+				curIdx = (curIdx + 1) % dwCount;
+			}
+			else
+			{
+				return Super::eventFilter(watched, event);;
+			}
+			auto myFocusWidget = QApplication::focusWidget();
+			if (isAncestorOf(myFocusWidget))
+			{
+				myFocusWidget->clearFocus();
+			}
+			dockAreaWidget()->setCurrentIndex(curIdx);
+			dockAreaWidget()->currentDockWidget()->setFocus(Qt::TabFocusReason);
+			return true;
+		}
+	}
+	return Super::eventFilter(watched, event);
+}
+
+bool CDockWidget::focusNextPrevChild(bool next)
+{
+	return Super::focusNextPrevChild(next);
+}
+
 //============================================================================
 void CDockWidget::setTitleBarActions(QList<QAction*> actions)
 {
@@ -1207,6 +1286,78 @@ bool CDockWidget::isTabbed() const
 bool CDockWidget::isCurrentTab() const
 {
     return d->DockArea && (d->DockArea->currentDockWidget() == this);
+}
+
+//============================================================================
+void CDockWidget::addCustomButton(const QIcon& icon, bool initialState,
+                                  const QString& tooltip, Qt::Alignment align,
+                                  const std::function<void()>& onClicked)
+{
+    CDockWidget::CustomButtonData* customButton =
+        new CDockWidget::CustomButtonData;
+    customButton->Text = "";
+    customButton->Icon = icon;
+    customButton->InitialState = initialState ? Qt::Checked : Qt::Unchecked;
+    customButton->CurrentState = customButton->InitialState;
+    customButton->CurrentButton = nullptr;
+    customButton->Tooltip = tooltip;
+    customButton->Alignment = align;
+    customButton->OnClicked = onClicked;
+    d->CustomButtons.push_back(customButton);
+}
+
+//============================================================================
+void CDockWidget::addCustomButton(const QIcon& icon, const QString& tooltip,
+                                  Qt::Alignment align,
+                                  const std::function<void()>& onClicked)
+{
+    CDockWidget::CustomButtonData* customButton =
+        new CDockWidget::CustomButtonData;
+    customButton->Text = "";
+    customButton->Icon = icon;
+    customButton->InitialState = (Qt::CheckState)-1;
+    customButton->CurrentState = customButton->InitialState;
+    customButton->CurrentButton = nullptr;
+    customButton->Tooltip = tooltip;
+    customButton->Alignment = align;
+    customButton->OnClicked = onClicked;
+    d->CustomButtons.push_back(customButton);
+}
+
+//============================================================================
+const QList<CDockWidget::CustomButtonData*>& CDockWidget::customButtons()
+{
+    return d->CustomButtons;
+}
+
+//============================================================================
+void CDockWidget::removeCustomButton(CDockWidget::CustomButtonData* bData)
+{
+	if (bData)
+	{
+		if (dockAreaWidget() && dockAreaWidget()->titleBar())
+		{
+			dockAreaWidget()->titleBar()->removeButton(this, bData);
+		}
+    int idx = d->CustomButtons.indexOf(bData);
+    if (idx >= 0 && idx < d->CustomButtons.count())
+    {
+        delete d->CustomButtons[idx];
+        d->CustomButtons.erase(d->CustomButtons.begin() + idx);
+    }
+}
+	else
+	{
+		if (dockAreaWidget() && dockAreaWidget()->titleBar())
+		{
+			dockAreaWidget()->titleBar()->removeButtons(this);
+		}
+		for (auto customButtonData : d->CustomButtons)
+		{
+			delete customButtonData;
+		}
+		d->CustomButtons.clear();
+	}
 }
 
 //============================================================================

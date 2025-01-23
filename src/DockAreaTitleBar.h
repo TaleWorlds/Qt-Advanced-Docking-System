@@ -31,6 +31,7 @@
 #include <QFrame>
 #include <QToolButton>
 
+#include "DockWidget.h"
 #include "ads_globals.h"
 
 QT_FORWARD_DECLARE_CLASS(QAbstractButton)
@@ -39,9 +40,11 @@ namespace ads
 {
 class CDockAreaTabBar;
 class CDockAreaWidget;
+class CDockWidget;
 struct DockAreaTitleBarPrivate;
 class CElidingLabel;
 class CDockAreaTitleBar;
+struct CustomButtonData;
 
 using tTitleBarButton = QToolButton;
 
@@ -52,7 +55,7 @@ using tTitleBarButton = QToolButton;
  * always invisible CDockManager::DockAreaHideDisabledButtons - if set to 'true'
  * hides button when it is disabled
  */
-class CTitleBarButton : public tTitleBarButton
+class ADS_EXPORT CTitleBarButton : public tTitleBarButton
 {
     Q_OBJECT
 private:
@@ -118,7 +121,6 @@ private Q_SLOTS:
     void onUndockButtonClicked();
     void onTabsMenuActionTriggered(QAction* Action);
     void onCurrentTabChanged(int Index);
-    void onAddButtonClicked(bool checked = false);
     void onAutoHideButtonClicked();
     void onAutoHideDockAreaActionClicked();
     void onAutoHideToActionClicked();
@@ -181,6 +183,16 @@ public:
     CTitleBarButton* button(TitleBarButton which) const;
 
     /**
+     * Returns the custom buttons that will be opened only when this widget is
+     * current The second pair contains the custom buttons that do not belong that
+     * widget
+     */
+    QPair<QList<CTitleBarButton*>, QList<CTitleBarButton*>> buttons(
+        CDockWidget* dockWidget) const;
+
+    bool hasCustomButtons() const;
+
+    /**
      * Returns the auto hide title label, used when the dock area is expanded and
      * auto hidden
      */
@@ -208,6 +220,20 @@ public:
      * You can use this function to insert custom widgets into the title bar.
      */
     void insertWidget(int index, QWidget* widget);
+
+	/**
+	 * Creates the CTitleBarButtons from dock widget button data's contained in the source dock widget
+	 */
+    void addButton(CDockWidget::CustomButtonData* data, CDockWidget* source);
+
+	/**
+	 * Removes the CTitleBarButtons from the dock area title bar 
+	 */
+	void removeButtons(ads::CDockWidget* source);
+	/**
+	 * Removes a CTitleBarButton from the dock area title bar
+	 */
+	void removeButton(ads::CDockWidget* source, ads::CDockWidget::CustomButtonData* bData);
 
     /**
      * Searches for widget widget in this title bar.

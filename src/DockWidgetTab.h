@@ -70,6 +70,9 @@ protected:
     virtual void mouseReleaseEvent(QMouseEvent* ev) override;
     virtual void mouseMoveEvent(QMouseEvent* ev) override;
     virtual void contextMenuEvent(QContextMenuEvent* ev) override;
+    virtual void enterEvent(QEnterEvent* ev) override;
+    virtual void leaveEvent(QEvent* ev) override; 
+
 
     /**
      * Double clicking the tab widget makes the assigned dock widget floating
@@ -89,6 +92,8 @@ public:
      * Virtual Destructor
      */
     virtual ~CDockWidgetTab();
+
+	bool mouseOver() const;
 
     /**
      * Returns true, if this is the active tab

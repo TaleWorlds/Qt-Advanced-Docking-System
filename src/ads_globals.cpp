@@ -52,6 +52,9 @@ namespace internal
 {
 const int FloatingWidgetDragStartEvent = QEvent::registerEventType();
 const int DockedWidgetDragStartEvent = QEvent::registerEventType();
+const int AutoHideAreaWidth = 32;
+const int AutoHideAreaMouseZone = 32;
+const int AutoHideAreaVisibleExtraMouseZone = 10;
 #if defined(Q_OS_UNIX) && !defined(Q_OS_MACOS)
 static QString _window_manager;
 static QHash<QString, xcb_atom_t> _xcb_atom_cache;
@@ -462,6 +465,18 @@ QRect globalGeometry(QWidget* w)
     g.moveTopLeft(w->mapToGlobal(QPoint(0, 0)));
     return g;
 }
+
+CFloatingWidgetDragStartEvent::CFloatingWidgetDragStartEvent(QEvent::Type type,
+                                                             QWidget* contnt)
+    : QEvent(type), mContent(contnt)
+{}
+
+QWidget* CFloatingWidgetDragStartEvent::content() const
+{
+    return mContent;
+}
+
+Q_IMPL_EVENT_COMMON(CFloatingWidgetDragStartEvent)
 
 }  // namespace internal
 }  // namespace ads

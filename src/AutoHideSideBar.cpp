@@ -29,7 +29,9 @@
 #include "AutoHideSideBar.h"
 
 #include <QBoxLayout>
+#include <QCoreApplication>
 #include <QPainter>
+#include <QScrollBar>
 #include <QStyleOption>
 #include <QXmlStreamWriter>
 
@@ -124,6 +126,7 @@ CAutoHideSideBar::CAutoHideSideBar(CDockContainerWidget* parent,
                                    SideBarLocation area)
     : Super(parent), d(new AutoHideSideBarPrivate(this))
 {
+    setContentsMargins(0, 0, 0, 0);
     d->SideTabArea = area;
     d->ContainerWidget = parent;
     d->Orientation = (area == SideBarLocation::SideBarBottom
@@ -134,8 +137,18 @@ CAutoHideSideBar::CAutoHideSideBar(CDockContainerWidget* parent,
     setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
     setFrameStyle(QFrame::NoFrame);
     setWidgetResizable(true);
-    setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    if (d->Orientation == Qt::Horizontal)
+	{
+		setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+		setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+		horizontalScrollBar()->setMaximumHeight(15);
+	}
+    else
+	{
+		setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+		setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+        verticalScrollBar()->setMaximumWidth(15);
+    }
 
     d->TabsContainerWidget = new CTabsWidget();
     d->TabsContainerWidget->EventHandler = d;
@@ -155,13 +168,12 @@ CAutoHideSideBar::CAutoHideSideBar(CDockContainerWidget* parent,
     setFocusPolicy(Qt::NoFocus);
     if (d->isHorizontal())
     {
-        setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+        setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Maximum);
     }
     else
     {
-        setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
+        setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Expanding);
     }
-
     hide();
 }
 
@@ -194,7 +206,7 @@ void CAutoHideSideBar::insertTab(int Index, CAutoHideTab* SideTab)
     {
         d->TabsLayout->insertWidget(Index, SideTab);
     }
-    show();
+	show();
 }
 
 //============================================================================
@@ -264,6 +276,16 @@ void CAutoHideSideBar::removeTab(CAutoHideTab* SideTab)
     if (d->TabsLayout->isEmpty())
     {
         hide();
+    }
+}
+
+void CAutoHideSideBar::wheelEvent(QWheelEvent* Event)
+{
+    QScrollArea::wheelEvent(Event);
+    if (!(Event->modifiers() & Qt::AltModifier) && horizontalScrollBar()->isVisible())
+	{
+		QCoreApplication::sendEvent(horizontalScrollBar(), Event);
+        return;
     }
 }
 
@@ -391,15 +413,31 @@ void CAutoHideSideBar::saveState(QXmlStreamWriter& s) const
 //===========================================================================
 QSize CAutoHideSideBar::minimumSizeHint() const
 {
-    QSize Size = sizeHint();
-    Size.setWidth(10);
-    return Size;
+    QSize Size = sizeHint(); 
+    if (d->Orientation == Qt::Horizontal)
+	{
+		Size.setWidth(10);
+    }
+    else
+    {
+        Size.setHeight(10);
+    }
+	return Size;
 }
 
 //===========================================================================
 QSize CAutoHideSideBar::sizeHint() const
 {
-    return d->TabsContainerWidget->sizeHint();
+	auto sh =  d->TabsContainerWidget->sizeHint();
+    if (d->Orientation == Qt::Vertical)
+    {
+        return sh + QSize(verticalScrollBar()->sizeHint().width(), 0);
+    }
+    else if (d->Orientation == Qt::Horizontal )
+	{
+		return sh + QSize(0, horizontalScrollBar()->sizeHint().height());
+    }
+    return sh;
 }
 
 //===========================================================================

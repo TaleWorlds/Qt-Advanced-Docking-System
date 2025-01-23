@@ -28,10 +28,24 @@
 //============================================================================
 #include "DockManager.h"
 
+#include "DockAreaTitleBar.h"
+#include "DockAreaWidget.h"
+#include "DockFocusController.h"
+#include "DockOverlay.h"
+#include "DockSplitter.h"
+#include "DockWidget.h"
+#include "DockWidgetTab.h"
+#include "DockingStateReader.h"
+#include "FloatingDockContainer.h"
+#include "IconProvider.h"
+#include "ads_globals.h"
+
+#include <AutoHideDockContainer.h>
 #include <QAction>
 #include <QApplication>
 #include <QDebug>
 #include <QFile>
+#include <QGuiApplication>
 #include <QLayout>
 #include <QList>
 #include <QMainWindow>
@@ -44,23 +58,8 @@
 #include <QWindow>
 #include <QWindowStateChangeEvent>
 #include <QXmlStreamWriter>
-
-#include <AutoHideDockContainer.h>
-
 #include <algorithm>
 #include <iostream>
-
-#include "DockAreaTitleBar.h"
-#include "DockAreaWidget.h"
-#include "DockFocusController.h"
-#include "DockOverlay.h"
-#include "DockSplitter.h"
-#include "DockWidget.h"
-#include "DockWidgetTab.h"
-#include "DockingStateReader.h"
-#include "FloatingDockContainer.h"
-#include "IconProvider.h"
-#include "ads_globals.h"
 
 // #include "FloatingWidgetTitleBar.h"
 
@@ -85,14 +84,14 @@ namespace ads
  */
 enum eStateFileVersion
 {
-    InitialVersion = 0,        //!< InitialVersion
-    Version1 = 1,              //!< Version1
-    CurrentVersion = Version1  //!< CurrentVersion
+	InitialVersion = 0,		  //!< InitialVersion
+	Version1 = 1,			  //!< Version1
+	Version2 = 2,
+	CurrentVersion = Version2 //!< CurrentVersion
 };
 
-static CDockManager::ConfigFlags StaticConfigFlags =
-    CDockManager::DefaultNonOpaqueConfig;
-static CDockManager::AutoHideFlags StaticAutoHideConfigFlags;  // auto hide
+static CDockManager::ConfigFlags StaticConfigFlags = CDockManager::DefaultNonOpaqueConfig;
+static CDockManager::AutoHideFlags StaticAutoHideConfigFlags; // auto hide
                                                                // feature is
                                                                // disabled by
                                                                // default
@@ -114,8 +113,7 @@ struct DockManagerPrivate
     QMap<QString, QByteArray> Perspectives;
     QMap<QString, QMenu*> ViewMenuGroups;
     QMenu* ViewMenu;
-    CDockManager::eViewMenuInsertionOrder MenuInsertionOrder =
-        CDockManager::MenuAlphabeticallySorted;
+	CDockManager::eViewMenuInsertionOrder MenuInsertionOrder = CDockManager::MenuAlphabeticallySorted;
     bool RestoringState = false;
     QVector<CFloatingDockContainer*> UninitializedFloatingWidgets;
     CDockFocusController* FocusController = nullptr;
@@ -140,8 +138,7 @@ struct DockManagerPrivate
     /**
      * Restores the state
      */
-    bool restoreStateFromXml(const QByteArray& state, int version,
-                             bool Testing = internal::Restore);
+	bool restoreStateFromXml(const QByteArray& state, int version, bool Testing = internal::Restore);
 
     /**
      * Restore state
@@ -180,7 +177,7 @@ struct DockManagerPrivate
     /**
      * Loads the stylesheet
      */
-    void loadStylesheet();
+	void loadStyle();
 
     /**
      * Adds action to menu - optionally in sorted order
@@ -191,18 +188,20 @@ struct DockManagerPrivate
 // struct DockManagerPrivate
 
 //============================================================================
-DockManagerPrivate::DockManagerPrivate(CDockManager* _public) : _this(_public)
-{}
+DockManagerPrivate::DockManagerPrivate(CDockManager* _public)
+	: _this(_public)
+{
+}
 
 //============================================================================
-void DockManagerPrivate::loadStylesheet()
+void DockManagerPrivate::loadStyle()
 {
     initResource();
+	if (!ads::CDockManager::testConfigFlag(ads::CDockManager::eConfigFlag::UseProxyStyle))
+	{
     QString Result;
     QString FileName = ":ads/stylesheets/";
-    FileName += CDockManager::testConfigFlag(CDockManager::FocusHighlighting) ?
-                    "focus_highlighting" :
-                    "default";
+		FileName += CDockManager::testConfigFlag(CDockManager::FocusHighlighting) ? "focus_highlighting" : "default";
 #if defined(Q_OS_UNIX) && !defined(Q_OS_MACOS)
     FileName += "_linux";
 #endif
@@ -214,10 +213,129 @@ void DockManagerPrivate::loadStylesheet()
     StyleSheetFile.close();
     _this->setStyleSheet(Result);
 }
+	else
+	{
+        bool lightTheme =
+            QApplication::palette().color(QPalette::ColorRole::Base).lightnessF()
+            > 0.5f;
+		QIcon autoHideIcon;
+        if (lightTheme)
+        {
+            autoHideIcon.addFile(":/ads/images/vs-pin-button.svg", QSize(16, 16),
+                                 QIcon::Normal, QIcon::Off);
+            autoHideIcon.addFile(":/ads/images/vs-pin-button-pinned.svg",
+                                 QSize(16, 16), QIcon::Normal, QIcon::On);
+            autoHideIcon.addFile(":/ads/images/vs-pin-button-disabled.svg",
+                                 QSize(16, 16), QIcon::Disabled, QIcon::Off);
+        }
+        else
+        {
+            autoHideIcon.addFile(":/ads/images/vs-pin-button-focused.svg", QSize(16, 16),
+                                 QIcon::Normal, QIcon::Off);
+            autoHideIcon.addFile(":/ads/images/vs-pin-button-pinned-focused.svg",
+                                 QSize(16, 16), QIcon::Normal, QIcon::On);
+            autoHideIcon.addFile(":/ads/images/vs-pin-button-disabled.svg",
+                                 QSize(16, 16), QIcon::Disabled, QIcon::Off);
+        }
+		_this->iconProvider().registerCustomIcon(ads::eIcon::AutoHideIcon, autoHideIcon);
+
+        QIcon closeIcon;
+		if (lightTheme)
+        {
+            closeIcon.addFile(":/ads/images/close-button.svg", QSize(16, 16),
+                              QIcon::Normal, QIcon::Off);
+            closeIcon.addFile(":/ads/images/close-disabled.svg", QSize(16, 16),
+                              QIcon::Disabled, QIcon::Off);
+        }
+        else
+        {
+            closeIcon.addFile(":/ads/images/close-button-focused.svg", QSize(16, 16),
+                              QIcon::Normal, QIcon::Off);
+            closeIcon.addFile(":/ads/images/close-disabled.svg", QSize(16, 16),
+                              QIcon::Disabled, QIcon::Off);
+        }
+		_this->iconProvider().registerCustomIcon(ads::eIcon::TabCloseIcon, closeIcon);
+		_this->iconProvider().registerCustomIcon(ads::eIcon::DockAreaCloseIcon, closeIcon);
+
+		QIcon menuIcon;
+        if (lightTheme)
+        {
+            menuIcon.addFile(":/ads/images/downarrow.svg", QSize(16, 16),
+                             QIcon::Normal, QIcon::Off);
+            menuIcon.addFile(":/ads/images/downarrow-diasbled.svg", QSize(16, 16),
+                             QIcon::Disabled, QIcon::Off);
+        }
+        else
+        {
+            menuIcon.addFile(":/ads/images/downarrow-focused.svg", QSize(16, 16),
+                             QIcon::Normal, QIcon::Off);
+            menuIcon.addFile(":/ads/images/downarrow-diasbled.svg", QSize(16, 16),
+                             QIcon::Disabled, QIcon::Off);
+		}
+		_this->iconProvider().registerCustomIcon(ads::eIcon::DockAreaMenuIcon, menuIcon);
+
+		QIcon normalIcon;
+        if (lightTheme)
+        {
+            normalIcon.addFile(":/ads/images/detach-button.svg", QSize(16, 16),
+                               QIcon::Normal, QIcon::Off);
+            normalIcon.addFile(":/ads/images/detach-button-disabled.svg",
+                               QSize(16, 16), QIcon::Disabled, QIcon::Off);
+        }
+        else
+        {
+            normalIcon.addFile(":/ads/images/detach-button-focused.svg", QSize(16, 16),
+                               QIcon::Normal, QIcon::Off);
+            normalIcon.addFile(":/ads/images/detach-button-disabled.svg",
+                               QSize(16, 16), QIcon::Disabled, QIcon::Off);
+        }
+		_this->iconProvider().registerCustomIcon(ads::eIcon::NormalIcon, normalIcon);
+		_this->iconProvider().registerCustomIcon(ads::eIcon::DockAreaUndockIcon, normalIcon);
+
+		QIcon maximizeIcon;
+        if (lightTheme)
+        {
+            maximizeIcon.addFile(":/ads/images/maximize-button.svg",
+                                 QSize(16, 16), QIcon::Normal, QIcon::Off);
+        }
+        else
+        {
+            maximizeIcon.addFile(":/ads/images/maximize-button-focused.svg",
+                                 QSize(16, 16), QIcon::Normal, QIcon::Off);
+        }
+		_this->iconProvider().registerCustomIcon(ads::eIcon::MaximizeIcon, maximizeIcon);
+
+		QIcon minimizeIcon;
+        if (lightTheme)
+        {
+            minimizeIcon.addFile(":/ads/images/minimize-button.svg",
+                                 QSize(16, 16), QIcon::Normal, QIcon::Off);
+        }
+        else
+        {
+            minimizeIcon.addFile(":/ads/images/minimize-button-focused.svg",
+                                 QSize(16, 16), QIcon::Normal, QIcon::Off);
+        }
+		_this->iconProvider().registerCustomIcon(ads::eIcon::DockAreaMinimizeIcon, minimizeIcon);
+
+		QIcon addIcon;
+        if (lightTheme)
+        {
+            addIcon.addFile(":/ads/images/plus.svg", QSize(16, 16), QIcon::Normal,
+                            QIcon::Off);
+        }
+        else
+        {
+            addIcon.addFile(":/ads/images/plus-focused.svg", QSize(16, 16), QIcon::Normal,
+                            QIcon::Off);
+        }
+		_this->iconProvider().registerCustomIcon(ads::eIcon::AddIcon, addIcon);
+
+	}
+}
 
 //============================================================================
-bool DockManagerPrivate::restoreContainer(int Index, CDockingStateReader& stream,
-                                          bool Testing)
+bool DockManagerPrivate::restoreContainer(int Index, CDockingStateReader& stream, bool Testing)
 {
     if (Testing)
     {
@@ -227,14 +345,13 @@ bool DockManagerPrivate::restoreContainer(int Index, CDockingStateReader& stream
     if (Index >= Containers.count())
     {
         bool IsIndependent = stream.attributes().value("Independent").toInt();
-        CFloatingDockContainer* FloatingWidget =
-            new CFloatingDockContainer(_this, IsIndependent);
+		CFloatingDockContainer* FloatingWidget = new CFloatingDockContainer(_this, IsIndependent);
         Result = FloatingWidget->restoreState(stream, Testing);
         FloatingWidget->dockContainer()->fetchIndependentCount();
     }
     else if (Index >= 0)
     {
-        ADS_PRINT("d->Containers[i]->restoreState ");  // setPerspective case
+		ADS_PRINT("d->Containers[i]->restoreState "); // setPerspective case
         auto Container = Containers[Index];
         if (Container->isFloating())
         {
@@ -246,10 +363,15 @@ bool DockManagerPrivate::restoreContainer(int Index, CDockingStateReader& stream
             }
             else
             {
+                int idx = FloatingWidgets.indexOf(FloatingWidget);
                 FloatingWidget->hideAndDeleteLater();
                 FloatingWidget = new CFloatingDockContainer(_this, IsIndependent);
-                FloatingWidget->restoreState(stream, Testing);
+                Result = FloatingWidget->restoreState(stream, Testing);
                 FloatingWidget->dockContainer()->fetchIndependentCount();
+                int newIdx = FloatingWidgets.indexOf(FloatingWidget);
+                FloatingWidgets.erase(FloatingWidgets.begin() + newIdx);
+                FloatingWidgets.insert(FloatingWidgets.begin() + idx,
+                                       FloatingWidget);
             }
         }
         else
@@ -272,8 +394,7 @@ bool DockManagerPrivate::checkFormat(const QByteArray& state, int version)
 }
 
 //============================================================================
-bool DockManagerPrivate::restoreStateFromXml(const QByteArray& state, int version,
-                                             bool Testing)
+bool DockManagerPrivate::restoreStateFromXml(const QByteArray& state, int version, bool Testing)
 {
     Q_UNUSED(version);
 
@@ -389,8 +510,7 @@ void DockManagerPrivate::restoreDockWidgetsOpenState()
         }
         else
         {
-            DockWidget->toggleViewInternal(
-                !DockWidget->property(internal::ClosedProperty).toBool());
+			DockWidget->toggleViewInternal(!DockWidget->property(internal::ClosedProperty).toBool());
         }
     }
 }
@@ -408,8 +528,7 @@ void DockManagerPrivate::restoreDockAreasIndices()
         for (int i = 0; i < DockContainer->dockAreaCount(); ++i)
         {
             CDockAreaWidget* DockArea = DockContainer->dockArea(i);
-            QString DockWidgetName =
-                DockArea->property("currentDockWidget").toString();
+			QString DockWidgetName = DockArea->property("currentDockWidget").toString();
             CDockWidget* DockWidget = nullptr;
             if (!DockWidgetName.isEmpty())
             {
@@ -488,14 +607,15 @@ bool DockManagerPrivate::restoreState(const QByteArray& State, int version)
 }
 
 //============================================================================
-void DockManagerPrivate::addActionToMenu(QAction* Action, QMenu* Menu,
-                                         bool InsertSorted)
+void DockManagerPrivate::addActionToMenu(QAction* Action, QMenu* Menu, bool InsertSorted)
 {
     if (InsertSorted)
     {
         auto Actions = Menu->actions();
-        auto it = std::find_if(
-            Actions.begin(), Actions.end(), [&Action](const QAction* a) {
+		auto it = std::find_if(Actions.begin(),
+							   Actions.end(),
+							   [&Action](const QAction* a)
+							   {
                 return a->text().compare(Action->text(), Qt::CaseInsensitive) > 0;
             });
 
@@ -516,7 +636,8 @@ void DockManagerPrivate::addActionToMenu(QAction* Action, QMenu* Menu,
 
 //============================================================================
 CDockManager::CDockManager(QWidget* parent)
-    : CDockContainerWidget(this, parent), d(new DockManagerPrivate(this))
+	: CDockContainerWidget(this, parent)
+	, d(new DockManagerPrivate(this))
 {
     createRootSplitter();
     createSideTabBarWidgets();
@@ -527,12 +648,10 @@ CDockManager::CDockManager(QWidget* parent)
     }
 
     d->ViewMenu = new QMenu(tr("Show View"), this);
-    d->DockAreaOverlay =
-        new CDockOverlay(this, CDockOverlay::ModeDockAreaOverlay);
-    d->ContainerOverlay =
-        new CDockOverlay(this, CDockOverlay::ModeContainerOverlay);
+	d->DockAreaOverlay = new CDockOverlay(this, CDockOverlay::ModeDockAreaOverlay);
+	d->ContainerOverlay = new CDockOverlay(this, CDockOverlay::ModeContainerOverlay);
     d->Containers.append(this);
-    // d->loadStylesheet();
+	d->loadStyle();
 
     if (CDockManager::testConfigFlag(CDockManager::FocusHighlighting))
     {
@@ -540,7 +659,10 @@ CDockManager::CDockManager(QWidget* parent)
     }
 
     window()->installEventFilter(this);
-    connect(qApp, &QApplication::focusWindowChanged, [](QWindow* focusWindow) {
+	connect(qApp,
+			&QApplication::focusWindowChanged,
+			[](QWindow* focusWindow)
+			{
         // bring modal dialogs to foreground to ensure that they are in front of
         // any floating dock widget
         if (focusWindow && focusWindow->isModal())
@@ -548,11 +670,36 @@ CDockManager::CDockManager(QWidget* parent)
             focusWindow->raise();
         }
     });
+	QObject::connect((QGuiApplication*)QGuiApplication::instance(),
+		&QGuiApplication::applicationStateChanged,
+		this, &CDockManager::onApplicationStateChanged);
+	class TempEventFilter : public QObject
+	{
+	public:
+		CDockManager* mThis;
+		bool eventFilter(QObject* obj, QEvent* e) override
+		{
+			if (e->type() == QEvent::Type::ActivationChange)
+			{
+				QMainWindow* mainWindow = qobject_cast<QMainWindow*>(obj);
+				if (mainWindow->isActiveWindow())
+				{
+					mThis->onMainWindowActivated();
+}
+			}
+			return QObject::eventFilter(obj, e);
+		}
+	};
+	TempEventFilter filterObj;
+	filterObj.mThis = this;
+	MainWindow->installEventFilter(&filterObj);
 }
 
 //============================================================================
 CDockManager::~CDockManager()
 {
+	delete d->DockAreaOverlay;
+	delete d->ContainerOverlay;
     // fix memory leaks, see
     // https://github.com/githubuser0xFFFF/Qt-Advanced-Docking-System/issues/307
     std::vector<QPointer<ads::CDockAreaWidget>> areas;
@@ -617,8 +764,10 @@ bool CDockManager::eventFilter(QObject* obj, QEvent* e)
             // it ourself.
             if (QGuiApplication::platformName() == QLatin1String("xcb"))
             {
-                internal::xcb_update_prop(true, _window->window()->winId(),
-                                          "_NET_WM_STATE", "_NET_WM_STATE_ABOVE",
+				internal::xcb_update_prop(true,
+										  _window->window()->winId(),
+										  "_NET_WM_STATE",
+										  "_NET_WM_STATE_ABOVE",
                                           "_NET_WM_STATE_STAYS_ON_TOP");
             }
             else
@@ -638,11 +787,13 @@ bool CDockManager::eventFilter(QObject* obj, QEvent* e)
 
             if (QGuiApplication::platformName() == QLatin1String("xcb"))
             {
-#    ifdef Q_OS_LINUX
-                internal::xcb_update_prop(false, _window->window()->winId(),
-                                          "_NET_WM_STATE", "_NET_WM_STATE_ABOVE",
+#ifdef Q_OS_LINUX
+				internal::xcb_update_prop(false,
+										  _window->window()->winId(),
+										  "_NET_WM_STATE",
+										  "_NET_WM_STATE_ABOVE",
                                           "_NET_WM_STATE_STAYS_ON_TOP");
-#    endif
+#endif
             }
             else
             {
@@ -668,8 +819,7 @@ bool CDockManager::eventFilter(QObject* obj, QEvent* e)
             }
             else
             {
-                _window->setWindowState(_window->windowState()
-                                        & (~Qt::WindowMinimized));
+				_window->setWindowState(_window->windowState() & (~Qt::WindowMinimized));
             }
         }
         if (!window()->isMinimized())
@@ -683,19 +833,46 @@ bool CDockManager::eventFilter(QObject* obj, QEvent* e)
 //============================================================================
 bool CDockManager::eventFilter(QObject* obj, QEvent* e)
 {
-    if (e->type() == QEvent::WindowStateChange)
+	if (obj == window() && e->type() == QEvent::WindowStateChange)
     {
         QWindowStateChangeEvent* ev = static_cast<QWindowStateChangeEvent*>(e);
         if (ev->oldState().testFlag(Qt::WindowMinimized))
         {
             d->IsLeavingMinimized = true;
-            QMetaObject::invokeMethod(this, "endLeavingMinimizedState",
-                                      Qt::QueuedConnection);
+			QMetaObject::invokeMethod(this, "endLeavingMinimizedState", Qt::QueuedConnection);
         }
     }
     return Super::eventFilter(obj, e);
 }
 #endif
+
+void CDockManager::onApplicationStateChanged(Qt::ApplicationState newState)
+{
+	if (newState == Qt::ApplicationActive)
+	{
+		QList<CDockContainerWidget*> sorted(d->Containers.begin(), d->Containers.end());
+
+		struct CompareContainers
+		{
+			bool operator()(CDockContainerWidget*& lhs, CDockContainerWidget*& rhs)
+			{
+				return rhs->isInFrontOf(lhs);
+			}
+		};
+
+		std::sort(sorted.begin(), sorted.end(), CompareContainers());
+		for (auto* container : sorted)
+		{
+			container->raise();
+		}
+	}
+}
+
+void CDockManager::onMainWindowActivated()
+{
+	setZOrderWidgetIndex(zOrderWidgetCounter);
+	setZOrderWindowIndex(zOrderWindowCounter);
+}
 
 //============================================================================
 void CDockManager::endLeavingMinimizedState()
@@ -802,8 +979,7 @@ QByteArray CDockManager::saveState(int version) const
     }
     s.writeEndDocument();
 
-    return ConfigFlags.testFlag(XmlCompressionEnabled) ? qCompress(xmldata, 9) :
-                                                         xmldata;
+	return ConfigFlags.testFlag(XmlCompressionEnabled) ? qCompress(xmldata, 9) : xmldata;
 }
 
 //============================================================================
@@ -841,9 +1017,19 @@ bool CDockManager::restoreState(const QByteArray& state, int version)
     return Result;
 }
 
+bool CDockManager::checkFormat(const QByteArray& state, int version /*= 0*/)
+{
+	return d->checkFormat(state, version);
+}
+
 //============================================================================
-CFloatingDockContainer* CDockManager::addDockWidgetFloating(
-    CDockWidget* Dockwidget)
+QMap<QString, QByteArray> CDockManager::perspectives() const
+{
+    return d->Perspectives;
+}
+
+//============================================================================
+CFloatingDockContainer* CDockManager::addDockWidgetFloating(CDockWidget* Dockwidget)
 {
     d->DockWidgetsMap.insert(Dockwidget->objectName(), Dockwidget);
     CDockAreaWidget* OldDockArea = Dockwidget->dockAreaWidget();
@@ -853,8 +1039,7 @@ CFloatingDockContainer* CDockManager::addDockWidgetFloating(
     }
 
     Dockwidget->setDockManager(this);
-    CFloatingDockContainer* FloatingWidget =
-        new CFloatingDockContainer(Dockwidget);
+	CFloatingDockContainer* FloatingWidget = new CFloatingDockContainer(Dockwidget);
     FloatingWidget->resize(Dockwidget->size());
     if (isVisible())
     {
@@ -938,39 +1123,35 @@ CDockAreaWidget* CDockManager::addDockWidget(DockWidgetArea area,
 {
     d->DockWidgetsMap.insert(Dockwidget->objectName(), Dockwidget);
     auto Container = DockAreaWidget ? DockAreaWidget->dockContainer() : this;
-    auto AreaOfAddedDockWidget =
-        Container->addDockWidget(area, Dockwidget, DockAreaWidget, Index);
+	auto AreaOfAddedDockWidget = Container->addDockWidget(area, Dockwidget, DockAreaWidget, Index);
     Q_EMIT dockWidgetAdded(Dockwidget);
     return AreaOfAddedDockWidget;
 }
 
 //============================================================================
-CDockAreaWidget* CDockManager::addDockWidgetToContainer(
-    DockWidgetArea area, CDockWidget* Dockwidget,
+CDockAreaWidget* CDockManager::addDockWidgetToContainer(DockWidgetArea area,
+														CDockWidget* Dockwidget,
     CDockContainerWidget* DockContainerWidget)
 {
     d->DockWidgetsMap.insert(Dockwidget->objectName(), Dockwidget);
-    auto AreaOfAddedDockWidget =
-        DockContainerWidget->addDockWidget(area, Dockwidget);
+	auto AreaOfAddedDockWidget = DockContainerWidget->addDockWidget(area, Dockwidget);
     Q_EMIT dockWidgetAdded(Dockwidget);
     return AreaOfAddedDockWidget;
 }
 
 //============================================================================
-CAutoHideDockContainer* CDockManager::addAutoHideDockWidget(
-    SideBarLocation area, CDockWidget* Dockwidget)
+CAutoHideDockContainer* CDockManager::addAutoHideDockWidget(SideBarLocation area, CDockWidget* Dockwidget)
 {
     return addAutoHideDockWidgetToContainer(area, Dockwidget, this);
 }
 
 //============================================================================
-CAutoHideDockContainer* CDockManager::addAutoHideDockWidgetToContainer(
-    SideBarLocation area, CDockWidget* Dockwidget,
+CAutoHideDockContainer* CDockManager::addAutoHideDockWidgetToContainer(SideBarLocation area,
+																	   CDockWidget* Dockwidget,
     CDockContainerWidget* DockContainerWidget)
 {
     d->DockWidgetsMap.insert(Dockwidget->objectName(), Dockwidget);
-    auto container =
-        DockContainerWidget->createAndSetupAutoHideContainer(area, Dockwidget);
+	auto container = DockContainerWidget->createAndSetupAutoHideContainer(area, Dockwidget);
     container->collapseView(true);
 
     Q_EMIT dockWidgetAdded(Dockwidget);
@@ -978,8 +1159,7 @@ CAutoHideDockContainer* CDockManager::addAutoHideDockWidgetToContainer(
 }
 
 //============================================================================
-CDockAreaWidget* CDockManager::addDockWidgetTab(DockWidgetArea area,
-                                                CDockWidget* Dockwidget)
+CDockAreaWidget* CDockManager::addDockWidgetTab(DockWidgetArea area, CDockWidget* Dockwidget)
 {
     CDockAreaWidget* AreaWidget = lastAddedDockAreaWidget(area);
     if (AreaWidget)
@@ -993,11 +1173,9 @@ CDockAreaWidget* CDockManager::addDockWidgetTab(DockWidgetArea area,
 }
 
 //============================================================================
-CDockAreaWidget* CDockManager::addDockWidgetTabToArea(
-    CDockWidget* Dockwidget, CDockAreaWidget* DockAreaWidget, int Index)
+CDockAreaWidget* CDockManager::addDockWidgetTabToArea(CDockWidget* Dockwidget, CDockAreaWidget* DockAreaWidget, int Index)
 {
-    return addDockWidget(ads::CenterDockWidgetArea, Dockwidget, DockAreaWidget,
-                         Index);
+	return addDockWidget(ads::CenterDockWidgetArea, Dockwidget, DockAreaWidget, Index);
 }
 
 //============================================================================
@@ -1025,14 +1203,22 @@ QMap<QString, CDockWidget*> CDockManager::dockWidgetsMap() const
 //============================================================================
 void CDockManager::addPerspective(const QString& UniquePrespectiveName)
 {
-    d->Perspectives.insert(UniquePrespectiveName, saveState());
+    d->Perspectives.insert(UniquePrespectiveName, saveState(CurrentVersion));
+    Q_EMIT perspectiveListChanged();
+}
+
+//============================================================================
+void CDockManager::addPerspective(const QString& UniquePrespectiveName,
+                                  const QByteArray& PerspectiveData)
+{
+    d->Perspectives.insert(UniquePrespectiveName, PerspectiveData);
     Q_EMIT perspectiveListChanged();
 }
 
 //============================================================================
 void CDockManager::removePerspective(const QString& Name)
 {
-    removePerspectives({Name});
+	removePerspectives({ Name });
 }
 
 //============================================================================
@@ -1067,7 +1253,7 @@ void CDockManager::openPerspective(const QString& PerspectiveName)
     }
 
     Q_EMIT openingPerspective(PerspectiveName);
-    restoreState(Iterator.value());
+    restoreState(Iterator.value(), CurrentVersion);
     Q_EMIT perspectiveOpened(PerspectiveName);
 }
 
@@ -1076,8 +1262,7 @@ void CDockManager::savePerspectives(QSettings& Settings) const
 {
     Settings.beginWriteArray("Perspectives", d->Perspectives.size());
     int i = 0;
-    for (auto it = d->Perspectives.constBegin(); it != d->Perspectives.constEnd();
-         ++it)
+	for (auto it = d->Perspectives.constBegin(); it != d->Perspectives.constEnd(); ++it)
     {
         Settings.setArrayIndex(i);
         Settings.setValue("Name", it.key());
@@ -1156,18 +1341,14 @@ CDockAreaWidget* CDockManager::setCentralWidget(CDockWidget* widget)
     widget->setFeature(CDockWidget::DockWidgetPinnable, false);
     d->CentralWidget = widget;
     CDockAreaWidget* CentralArea = addDockWidget(CenterDockWidgetArea, widget);
-    CentralArea->setDockAreaFlag(
-        CDockAreaWidget::eDockAreaFlag::HideSingleWidgetTitleBar, true);
+	CentralArea->setDockAreaFlag(CDockAreaWidget::eDockAreaFlag::HideSingleWidgetTitleBar, true);
     return CentralArea;
 }
 
 //============================================================================
-QAction* CDockManager::addToggleViewActionToMenu(QAction* ToggleViewAction,
-                                                 const QString& Group,
-                                                 const QIcon& GroupIcon)
+QAction* CDockManager::addToggleViewActionToMenu(QAction* ToggleViewAction, const QString& Group, const QIcon& GroupIcon)
 {
-    bool AlphabeticallySorted =
-        (MenuAlphabeticallySorted == d->MenuInsertionOrder);
+	bool AlphabeticallySorted = (MenuAlphabeticallySorted == d->MenuInsertionOrder);
     if (!Group.isEmpty())
     {
         QMenu* GroupMenu = d->ViewMenuGroups.value(Group, nullptr);
@@ -1175,8 +1356,7 @@ QAction* CDockManager::addToggleViewActionToMenu(QAction* ToggleViewAction,
         {
             GroupMenu = new QMenu(Group, this);
             GroupMenu->setIcon(GroupIcon);
-            d->addActionToMenu(GroupMenu->menuAction(), d->ViewMenu,
-                               AlphabeticallySorted);
+			d->addActionToMenu(GroupMenu->menuAction(), d->ViewMenu, AlphabeticallySorted);
             d->ViewMenuGroups.insert(Group, GroupMenu);
         }
         else if (GroupMenu->icon().isNull() && !GroupIcon.isNull())
@@ -1194,11 +1374,9 @@ QAction* CDockManager::addToggleViewActionToMenu(QAction* ToggleViewAction,
     }
 }
 
-void CDockManager::removeToggleViewActionFromMenu(
-    QAction* ToggleViewAction, const QString& Group /*= QString()*/)
+void CDockManager::removeToggleViewActionFromMenu(QAction* ToggleViewAction, const QString& Group /*= QString()*/)
 {
-    bool AlphabeticallySorted =
-        (MenuAlphabeticallySorted == d->MenuInsertionOrder);
+	bool AlphabeticallySorted = (MenuAlphabeticallySorted == d->MenuInsertionOrder);
     if (!Group.isEmpty())
     {
         QMenu* GroupMenu = d->ViewMenuGroups.value(Group, 0);
@@ -1237,6 +1415,7 @@ QMenu* CDockManager::viewMenu() const
     return d->ViewMenu;
 }
 
+//============================================================================
 void CDockManager::clearViewMenu()
 {
     for (auto Group : d->ViewMenuGroups)
@@ -1247,6 +1426,18 @@ void CDockManager::clearViewMenu()
     d->ViewMenu->clear();
 }
 
+//============================================================================
+void CDockManager::resetViewMenu()
+{
+    for (auto Group : d->ViewMenuGroups)
+    {
+        Group->deleteLater();
+    }
+    d->ViewMenuGroups.clear();
+    d->ViewMenu->clear();
+    d->ViewMenu->deleteLater();
+    d->ViewMenu = new QMenu(tr("Show View"), this);
+}
 //============================================================================
 void CDockManager::setViewMenuInsertionOrder(eViewMenuInsertionOrder Order)
 {
@@ -1408,8 +1599,7 @@ QList<int> CDockManager::splitterSizes(CDockAreaWidget* ContainedArea) const
 }
 
 //===========================================================================
-void CDockManager::setSplitterSizes(CDockAreaWidget* ContainedArea,
-                                    const QList<int>& sizes)
+void CDockManager::setSplitterSizes(CDockAreaWidget* ContainedArea, const QList<int>& sizes)
 {
     if (!ContainedArea)
     {
@@ -1445,8 +1635,7 @@ QString CDockManager::floatingContainersTitle()
 }
 
 //===========================================================================
-void CDockManager::setDockWidgetToolBarStyle(Qt::ToolButtonStyle Style,
-                                             CDockWidget::eState State)
+void CDockManager::setDockWidgetToolBarStyle(Qt::ToolButtonStyle Style, CDockWidget::eState State)
 {
     if (CDockWidget::StateFloating == State)
     {
@@ -1459,8 +1648,7 @@ void CDockManager::setDockWidgetToolBarStyle(Qt::ToolButtonStyle Style,
 }
 
 //===========================================================================
-Qt::ToolButtonStyle CDockManager::dockWidgetToolBarStyle(
-    CDockWidget::eState State) const
+Qt::ToolButtonStyle CDockManager::dockWidgetToolBarStyle(CDockWidget::eState State) const
 {
     if (CDockWidget::StateFloating == State)
     {
@@ -1473,8 +1661,7 @@ Qt::ToolButtonStyle CDockManager::dockWidgetToolBarStyle(
 }
 
 //===========================================================================
-void CDockManager::setDockWidgetToolBarIconSize(const QSize& IconSize,
-                                                CDockWidget::eState State)
+void CDockManager::setDockWidgetToolBarIconSize(const QSize& IconSize, CDockWidget::eState State)
 {
     if (CDockWidget::StateFloating == State)
     {
@@ -1500,8 +1687,7 @@ QSize CDockManager::dockWidgetToolBarIconSize(CDockWidget::eState State) const
 }
 
 //===========================================================================
-void CDockManager::lockDockWidgetFeaturesGlobally(
-    CDockWidget::DockWidgetFeatures Value)
+void CDockManager::lockDockWidgetFeaturesGlobally(CDockWidget::DockWidgetFeatures Value)
 {
     // Limit the features to CDockWidget::GloballyLockableFeatures
     Value &= CDockWidget::GloballyLockableFeatures;
@@ -1520,13 +1706,12 @@ void CDockManager::lockDockWidgetFeaturesGlobally(
 }
 
 //===========================================================================
-CDockWidget::DockWidgetFeatures CDockManager::globallyLockedDockWidgetFeatures()
-    const
+CDockWidget::DockWidgetFeatures CDockManager::globallyLockedDockWidgetFeatures() const
 {
     return d->LockedDockWidgetFeatures;
 }
 
-}  // namespace ads
+} // namespace ads
 
 //---------------------------------------------------------------------------
 // EOF DockManager.cpp

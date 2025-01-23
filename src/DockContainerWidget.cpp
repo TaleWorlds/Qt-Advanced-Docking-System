@@ -391,7 +391,7 @@ public:
      */
     bool widgetResizesWithContainer(QWidget* widget);
 
-    // private slots: ------------------------------------------------------------
+    // private Q_SLOTS: ------------------------------------------------------------
     void onDockAreaViewToggled(bool Visible)
     {
         CDockAreaWidget* DockArea =
@@ -1217,6 +1217,8 @@ bool DockContainerWidgetPrivate::restoreSideBar(CDockingStateReader& s,
         }
 
         s.skipCurrentElement();
+
+        Q_EMIT DockManager->aboutToRestoreDockWidget(Name.toString(), Testing);
         CDockWidget* DockWidget = DockManager->findDockWidget(Name.toString());
         if (!DockWidget || Testing)
         {
@@ -1591,6 +1593,11 @@ void CDockContainerWidget::setZOrderWindowIndex(unsigned int idx)
     d->zOrderWindowIndex = idx;
 }
 
+void CDockContainerWidget::setZOrderWidgetIndex(unsigned int idx)
+{
+	d->zOrderWidgetIndex = idx;
+}
+
 //============================================================================
 bool CDockContainerWidget::isInFrontOf(CDockContainerWidget* Other) const
 {
@@ -1608,10 +1615,10 @@ bool CDockContainerWidget::isInFrontOf(CDockContainerWidget* Other) const
 bool CDockContainerWidget::event(QEvent* e)
 {
     bool Result = QWidget::event(e);
-    if (e->type() == QEvent::WindowActivate)
+	if (e->type() == QEvent::ActivationChange && window()->isActiveWindow()
+		|| e->type() == QEvent::Show && !d->zOrderWidgetIndex)
     {
-        if ((isFloating() && hasIndependentWidget())
-            || qobject_cast<CDockManager*>(this))
+		if ((isFloating() && hasIndependentWidget()) || qobject_cast<CDockManager*>(this))
         {
             d->zOrderWindowIndex = ++zOrderWindowCounter;
         }
@@ -1620,19 +1627,9 @@ bool CDockContainerWidget::event(QEvent* e)
             d->DockManager->setZOrderWindowIndex(++zOrderWindowCounter);
         }
         d->zOrderWidgetIndex = ++zOrderWidgetCounter;
-    }
-    else if (e->type() == QEvent::Show && !d->zOrderWidgetIndex)
-    {
-        if ((isFloating() && hasIndependentWidget())
-            || qobject_cast<CDockManager*>(this))
-        {
-            d->zOrderWindowIndex = ++zOrderWindowCounter;
-        }
-        else
-        {
-            d->DockManager->setZOrderWindowIndex(++zOrderWindowCounter);
-        }
-        d->zOrderWidgetIndex = ++zOrderWidgetCounter;
+		window()->raise();
+		e->accept();
+		return true;
     }
     return Result;
 }
@@ -2243,8 +2240,11 @@ void CDockContainerWidget::fetchIndependentCount()
     for (int j = 0; j < dockAreaCount(); j++)
     {
         auto DA = dockArea(j);
-        DA->fetchIndependentCount();
-        d->IndependentDWCount += DA->independentDockWidgetCount();
+		if (DA)
+		{
+            DA->fetchIndependentCount();
+            d->IndependentDWCount += DA->independentDockWidgetCount();
+		}
     }
 }
 
@@ -2360,6 +2360,20 @@ QRect CDockContainerWidget::contentRectGlobal() const
 CDockManager* CDockContainerWidget::dockManager() const
 {
     return d->DockManager;
+}
+
+void CDockContainerWidget::raise()
+{
+	if ((isFloating() && hasIndependentWidget()) || qobject_cast<CDockManager*>(this))
+	{
+		d->zOrderWindowIndex = ++zOrderWindowCounter;
+	}
+	else
+	{
+		d->DockManager->setZOrderWindowIndex(++zOrderWindowCounter);
+	}
+	d->zOrderWidgetIndex = ++zOrderWidgetCounter;
+	window()->raise();
 }
 
 //===========================================================================

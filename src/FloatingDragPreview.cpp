@@ -46,7 +46,8 @@ struct FloatingDragPreviewPrivate
     CDockAreaWidget* ContentSourceArea = nullptr;
     QPoint DragStartMousePosition;
     CDockManager* DockManager;
-    CDockContainerWidget* DropContainer = nullptr;
+	CDockContainerWidget* DropContainer = nullptr;
+	CDockContainerWidget* TopContainer = nullptr;
     qreal WindowOpacity;
     bool Hidden = false;
     QPixmap ContentPreviewPixmap;
@@ -147,7 +148,8 @@ void FloatingDragPreviewPrivate::updateDropOverlays(const QPoint& GlobalPos)
     }
 
     auto Containers = DockManager->dockContainers();
-    CDockContainerWidget* TopContainer = nullptr;
+	CDockContainerWidget* PrevTopContainer = TopContainer;
+    TopContainer = nullptr;
     for (auto ContainerWidget : Containers)
     {
         if (!ContainerWidget->isVisible())
@@ -205,25 +207,26 @@ void FloatingDragPreviewPrivate::updateDropOverlays(const QPoint& GlobalPos)
         DockManager->containerOverlay()->hideOverlay();
         return;
     }
+
+	if (TopContainer && TopContainer != PrevTopContainer)
+	{
+		TopContainer->raise();
+	}
+
     auto DockDropArea = DockAreaOverlay->dropAreaUnderCursor();
     auto ContainerDropArea = ContainerOverlay->dropAreaUnderCursor();
     int VisibleDockAreas = TopContainer->visibleDockAreaCount();
-    // Include the overlay widget we're dragging as a visible widget
     auto dockAreaWidget = qobject_cast<CDockAreaWidget*>(Content);
-    if (dockAreaWidget && dockAreaWidget->isAutoHide())
-    {
-        VisibleDockAreas++;
-    }
+	// Center dock widget area if the container has no dock area
     DockWidgetAreas AllowedContainerAreas =
         (VisibleDockAreas > 1) ? OuterDockAreas : CenterDockWidgetArea;
     auto DockArea = TopContainer->dockAreaAt(GlobalPos);
-    // If the dock container contains only one single DockArea, then we need
-    // to respect the allowed areas - only the center area is relevant here
-    // because all other allowed areas are from the container
+	// no dock area for the container overlay if one area exists
     if (VisibleDockAreas == 1 && DockArea)
     {
-        AllowedContainerAreas.setFlag(CenterDockWidgetArea, false);
+        AllowedContainerAreas = InvalidDockWidgetArea;
     }
+	// add auto hide areas if possible
     if (isContentPinnable())
     {
         AllowedContainerAreas |= AutoHideDockAreas;
@@ -233,21 +236,45 @@ void FloatingDragPreviewPrivate::updateDropOverlays(const QPoint& GlobalPos)
                                         != InvalidDockWidgetArea);
     DockWidgetArea DAWArea = InvalidDockWidgetArea;
     DockWidgetArea ContainerArea = InvalidDockWidgetArea;
-    if (DockArea && DockArea->isVisible() && VisibleDockAreas >= 0
-        && DockArea != ContentSourceArea)
+    if (DockArea && DockArea->isVisible() && VisibleDockAreas > 0)
     {
         DockAreaOverlay->enableDropPreview(true);
-        DockAreaOverlay->setAllowedAreas(DockArea->allowedAreas());
+		if (DockArea == ContentSourceArea)
+		{
+			// if the dragged widget is a dock widget and
+			// there are other widgets in that dock area
+			// then enable outer areas
+			if (DockArea->openDockWidgetsCount() > 1 && qobject_cast<CDockWidget*>(Content))
+			{
+				DockAreaOverlay->setAllowedAreas(DockArea->allowedAreas() & ~ads::DockWidgetArea::CenterDockWidgetArea);
+			}
+			else
+			{
+				DockAreaOverlay->setAllowedAreas(ads::DockWidgetArea::InvalidDockWidgetArea);
+			}
+		}
+		else
+		{
+			DockAreaOverlay->setAllowedAreas(DockArea->allowedAreas());
+		}
+		// If there is only one single visible dock area in a container, then
+		// it does not make sense to show a dock overlay because the dock area
+		// would be removed and inserted at the same position. Only auto hide
+		// area is allowed
+		if (dockAreaWidget && VisibleDockAreas == 1 && DockArea == ContentSourceArea)
+		{
+			ContainerOverlay->setAllowedAreas(isContentPinnable() ? AutoHideDockAreas : NoDockWidgetArea);
+		}
         DockWidgetArea Area = DockAreaOverlay->showOverlay(DockArea);
-        DAWArea = Area;
-        _this->activateWindow();
+		DAWArea = Area;
+		DockWidgetAreas ContainerDropAreas = ContainerDropArea;
         // A CenterDockWidgetArea for the dockAreaOverlay() indicates that
         // the mouse is in the title bar. If the ContainerArea is valid
         // then we ignore the dock area of the dockAreaOverlay() and disable
         // the drop preview
-        if ((Area == CenterDockWidgetArea)
-            && (ContainerDropArea != InvalidDockWidgetArea))
-        {
+		if ((Area == CenterDockWidgetArea) && (ContainerDropAreas.testAnyFlags(OuterDockAreas))
+			&& !(ContainerDropAreas.testAnyFlags(AutoHideDockAreas)))
+		{
             DockAreaOverlay->enableDropPreview(false);
             ContainerOverlay->enableDropPreview(true);
         }
@@ -256,28 +283,17 @@ void FloatingDragPreviewPrivate::updateDropOverlays(const QPoint& GlobalPos)
             ContainerOverlay->enableDropPreview(InvalidDockWidgetArea == Area);
         }
         ContainerArea = ContainerOverlay->showOverlay(TopContainer);
-        _this->activateWindow();
     }
     else
     {
         DockAreaOverlay->hideOverlay();
-        // If there is only one single visible dock area in a container, then
-        // it does not make sense to show a dock overlay because the dock area
-        // would be removed and inserted at the same position. Only auto hide
-        // area is allowed
-        if (VisibleDockAreas == 1)
-        {
-            ContainerOverlay->setAllowedAreas(AutoHideDockAreas);
-        }
         ContainerArea = ContainerOverlay->showOverlay(TopContainer);
-        _this->activateWindow();
-        if (DockArea == ContentSourceArea
-            && InvalidDockWidgetArea == ContainerDropArea)
-        {
-            DropContainer = nullptr;
-        }
+        
     }
-
+	if (InvalidDockWidgetArea == ContainerArea && InvalidDockWidgetArea == DAWArea)
+	{
+		DropContainer = nullptr;
+	}
     if (CDockManager::testConfigFlag(CDockManager::DragPreviewIsDynamic))
     {
         setHidden(DAWArea != InvalidDockWidgetArea
@@ -334,7 +350,7 @@ void FloatingDragPreviewPrivate::createFloatingWidget()
 
 //============================================================================
 CFloatingDragPreview::CFloatingDragPreview(QWidget* Content, QWidget* parent)
-    : QWidget(parent), d(new FloatingDragPreviewPrivate(this))
+    : QWidget(nullptr), d(new FloatingDragPreviewPrivate(this))
 {
     d->Content = Content;
     d->ContentFeatures = d->contentFeatures();
@@ -342,11 +358,11 @@ CFloatingDragPreview::CFloatingDragPreview(QWidget* Content, QWidget* parent)
     if (CDockManager::testConfigFlag(CDockManager::DragPreviewHasWindowFrame))
     {
         setWindowFlags(Qt::Window | Qt::WindowMaximizeButtonHint
-                       | Qt::WindowCloseButtonHint);
+                       | Qt::WindowCloseButtonHint | Qt::WindowStaysOnTopHint);
     }
     else
     {
-        setWindowFlags(Qt::Tool | Qt::FramelessWindowHint);
+		setWindowFlags(Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
         setAttribute(Qt::WA_NoSystemBackground);
         setAttribute(Qt::WA_TranslucentBackground);
     }
@@ -405,7 +421,8 @@ void CFloatingDragPreview::moveFloating()
     int BorderSize = (frameSize().width() - size().width()) / 2;
     const QPoint moveToPos = QCursor::pos() - d->DragStartMousePosition
                              - QPoint(BorderSize, 0);
-    move(moveToPos);
+	move(moveToPos);
+	qInfo() << "CFloatingDragPreview::moveFloating";
     d->updateDropOverlays(QCursor::pos());
 }
 
@@ -554,10 +571,7 @@ void CFloatingDragPreview::finishDragging()
             }
         }
     }
-    if (!aboutToDeleteOriginal)
-    {
-        close();
-    }
+	close();
     if (containerOverlay)
         containerOverlay->hideOverlay();
     if (dockAreaOverlay)
@@ -615,7 +629,7 @@ void CFloatingDragPreview::paintEvent(QPaintEvent* event)
     // frameless window
     if (!CDockManager::testConfigFlag(CDockManager::DragPreviewHasWindowFrame))
     {
-        QColor Color = palette().color(QPalette::Active, QPalette::Window);
+        QColor Color = palette().color(QPalette::Active, QPalette::Highlight);
         QPen Pen = painter.pen();
         Pen.setColor(Color.darker(120));
         Pen.setStyle(Qt::SolidLine);

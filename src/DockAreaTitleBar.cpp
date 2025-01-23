@@ -70,8 +70,9 @@ struct DockAreaTitleBarPrivate
     QPointer<CTitleBarButton> AutoHideButton;
     QPointer<CTitleBarButton> UndockButton;
     QPointer<CTitleBarButton> CloseButton;
-    QPointer<CTitleBarButton> AddButton;
+	QPointer<CSpacerWidget> SpacerWidget;
     QPointer<CTitleBarButton> MinimizeButton;
+    QList<QPointer<CTitleBarButton>> CustomButtons;
     QBoxLayout* Layout;
     CDockAreaWidget* DockArea;
     CDockAreaTabBar* TabBar;
@@ -169,19 +170,9 @@ DockAreaTitleBarPrivate::DockAreaTitleBarPrivate(CDockAreaTitleBar* _public)
 //============================================================================
 void DockAreaTitleBarPrivate::createButtons()
 {
-    QSizePolicy ButtonSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
+    QSizePolicy ButtonSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
 
-    // Add button
-    AddButton = new CTitleBarButton(
-        testConfigFlag(CDockManager::DockAreaHasTabsMenuButton), true,
-        TitleBarButtonAdd);
-    AddButton->setObjectName("dockAreaAddButton");
-    AddButton->setSizePolicy(ButtonSizePolicy);
-    AddButton->setIconSize({15, 15});
-    internal::setToolTip(AddButton, QObject::tr("New Tab"));
-    Layout->addWidget(AddButton, 0);
-    QObject::connect(AddButton, &QToolButton::clicked, _this,
-                     &CDockAreaTitleBar::onAddButtonClicked);
+	Layout->addWidget(SpacerWidget = new CSpacerWidget(_this));
 
     // Tabs menu button
     TabsMenuButton = new CTitleBarButton(
@@ -219,6 +210,21 @@ void DockAreaTitleBarPrivate::createButtons()
     _this->connect(UndockButton, SIGNAL(clicked()),
                    SLOT(onUndockButtonClicked()));
 
+	// Minimize button
+	MinimizeButton = new CTitleBarButton(
+		testAutoHideConfigFlag(CDockManager::AutoHideHasMinimizeButton), false,
+		TitleBarButtonMinimize);
+	MinimizeButton->setObjectName("dockAreaMinimizeButton");
+	MinimizeButton->setAutoRaise(true);
+	MinimizeButton->setVisible(false);
+	internal::setButtonIcon(MinimizeButton, QStyle::SP_TitleBarMinButton,
+		ads::DockAreaMinimizeIcon);
+	internal::setToolTip(MinimizeButton, QObject::tr("Minimize"));
+	MinimizeButton->setSizePolicy(ButtonSizePolicy);
+	Layout->addWidget(MinimizeButton, 0);
+	_this->connect(MinimizeButton, SIGNAL(clicked()),
+		SLOT(minimizeAutoHideContainer()));
+
     // AutoHide Button
     const auto autoHideEnabled =
         testAutoHideConfigFlag(CDockManager::AutoHideFeatureEnabled);
@@ -240,24 +246,11 @@ void DockAreaTitleBarPrivate::createButtons()
     _this->connect(AutoHideButton, SIGNAL(clicked()),
                    SLOT(onAutoHideButtonClicked()));
 
-    // Minimize button
-    MinimizeButton = new CTitleBarButton(
-        testAutoHideConfigFlag(CDockManager::AutoHideHasMinimizeButton), false,
-        TitleBarButtonMinimize);
-    MinimizeButton->setObjectName("dockAreaMinimizeButton");
-    MinimizeButton->setAutoRaise(true);
-    MinimizeButton->setVisible(false);
-    internal::setButtonIcon(MinimizeButton, QStyle::SP_TitleBarMinButton,
-                            ads::DockAreaMinimizeIcon);
-    internal::setToolTip(MinimizeButton, QObject::tr("Minimize"));
-    MinimizeButton->setSizePolicy(ButtonSizePolicy);
-    Layout->addWidget(MinimizeButton, 0);
-    _this->connect(MinimizeButton, SIGNAL(clicked()),
-                   SLOT(minimizeAutoHideContainer()));
+    
 
     // Close button
     CloseButton =
-        new CTitleBarButton(testConfigFlag(CDockManager::DockAreaHasCloseButton),
+        new CTitleBarButton(testConfigFlag(CDockManager::DockAreaHasCloseButton) || testAutoHideConfigFlag(CDockManager::AutoHideHasCloseButton),
                             true, TitleBarButtonClose);
     CloseButton->setObjectName("dockAreaCloseButton");
     CloseButton->setAutoRaise(true);
@@ -265,8 +258,10 @@ void DockAreaTitleBarPrivate::createButtons()
                             ads::DockAreaCloseIcon);
     internal::setToolTip(CloseButton,
                          _this->titleBarButtonToolTip(TitleBarButtonClose));
+    CloseButton->setContentsMargins(0, 0, 0, 0);
     CloseButton->setSizePolicy(ButtonSizePolicy);
-    CloseButton->setIconSize(QSize(20, 20));
+    CloseButton->setIconSize(QSize(16, 16));
+    CloseButton->setFixedSize(16, 16);
     Layout->addWidget(CloseButton, 0);
     _this->connect(CloseButton, SIGNAL(clicked()), SLOT(onCloseButtonClicked()));
 }
@@ -276,17 +271,10 @@ void DockAreaTitleBarPrivate::createAutoHideTitleLabel()
 {
     AutoHideTitleLabel = new CElidingLabel("");
     AutoHideTitleLabel->setObjectName("autoHideTitleLabel");
+    AutoHideTitleLabel->setContentsMargins(4, 0, 4, 0);
     // At position 0 is the tab bar - insert behind tab bar
-    Layout->insertWidget(1, AutoHideTitleLabel);
-    AutoHideTitleLabel->setVisible(false);  // Default hidden
-    if (AddButton)
-    {
-        Layout->insertWidget(3, new CSpacerWidget(_this));
-    }
-    else
-    {
-        Layout->insertWidget(2, new CSpacerWidget(_this));
-    }
+    Layout->addWidget(AutoHideTitleLabel);
+	AutoHideTitleLabel->setVisible(false); // Default hidden
 }
 
 //============================================================================
@@ -353,13 +341,11 @@ IFloatingWidget* DockAreaTitleBarPrivate::makeAreaFloating(const QPoint& Offset,
 //============================================================================
 void DockAreaTitleBarPrivate::startFloating(const QPoint& Offset)
 {
-    if (DockArea->autoHideDockContainer())
-    {
-        DockArea->autoHideDockContainer()->hide();
-    }
+	// we cant close the current auto hide container because if we do
+	// then the title bar cant process mouse move events correctly
     FloatingWidget = makeAreaFloating(Offset, DraggingFloatingWidget);
-    qApp->postEvent(
-        DockArea, new QEvent((QEvent::Type)internal::DockedWidgetDragStartEvent));
+    qApp->postEvent(DockArea,
+					new internal::CFloatingWidgetDragStartEvent((QEvent::Type)internal::DockedWidgetDragStartEvent, DockArea));
 }
 
 //============================================================================
@@ -375,8 +361,8 @@ CDockAreaTitleBar::CDockAreaTitleBar(CDockAreaWidget* parent)
     setLayout(d->Layout);
     setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
     d->createTabBar();
-    d->createButtons();
     d->createAutoHideTitleLabel();
+    d->createButtons();
     setFocusPolicy(Qt::NoFocus);
 }
 
@@ -572,11 +558,6 @@ void CDockAreaTitleBar::onCurrentTabChanged(int Index)
     updateDockWidgetActionsButtons();
 }
 
-void CDockAreaTitleBar::onAddButtonClicked(bool checked /*= false*/)
-{
-    emit d->dockManager()->addButtonClicked(d->DockArea);
-}
-
 //============================================================================
 void CDockAreaTitleBar::onAutoHideButtonClicked()
 {
@@ -613,11 +594,36 @@ CTitleBarButton* CDockAreaTitleBar::button(TitleBarButton which) const
     case TitleBarButtonTabsMenu: return d->TabsMenuButton;
     case TitleBarButtonUndock: return d->UndockButton;
     case TitleBarButtonClose: return d->CloseButton;
-    case TitleBarButtonAdd: return d->AddButton;
     case TitleBarButtonAutoHide: return d->AutoHideButton;
     case TitleBarButtonMinimize: return d->MinimizeButton;
     default: return nullptr;
     }
+}
+
+QPair<QList<CTitleBarButton*>, QList<CTitleBarButton*>>
+CDockAreaTitleBar::buttons(ads::CDockWidget* dockWidget) const
+{
+    QList<CTitleBarButton*> ret1;
+    QList<CTitleBarButton*> ret2;
+    for (auto custButton : d->CustomButtons)
+    {
+        ads::CDockWidget* id =
+            qobject_cast<ads::CDockWidget*>((QWidget*)custButton->buttonId());
+        if (id && id == dockWidget)
+        {
+            ret1.push_back(custButton);
+        }
+        else
+        {
+            ret2.push_back(custButton);
+        }
+    }
+    return {ret1, ret2};
+}
+
+bool CDockAreaTitleBar::hasCustomButtons() const
+{
+    return !d->CustomButtons.isEmpty();
 }
 
 //============================================================================
@@ -842,6 +848,91 @@ void CDockAreaTitleBar::insertWidget(int index, QWidget* widget)
 {
     d->Layout->insertWidget(index, widget);
 }
+
+//============================================================================
+void CDockAreaTitleBar::addButton(CDockWidget::CustomButtonData* data,
+                                  CDockWidget* source)
+{
+    CTitleBarButton* newButton = new CTitleBarButton(
+        true, true, (ads::TitleBarButton)((int64_t)source), this);
+    data->CurrentButton = newButton;
+    newButton->setAutoFillBackground(false);
+    newButton->setCheckable((int)data->InitialState != -1);
+    newButton->setAutoRaise(true);
+    if ((int)data->CurrentState != -1)
+    {
+        newButton->setChecked(data->CurrentState == Qt::Checked ? true : false);
+    }
+    if (data->Icon.isNull())
+    {
+        newButton->setText(data->Text);
+    }
+    else
+    {
+        newButton->setIcon(data->Icon);
+        newButton->setIconSize({16, 16});
+    }
+    newButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    newButton->setFixedSize(20, 20);
+    d->CustomButtons.push_back(newButton);
+    internal::setToolTip(newButton, data->Tooltip);
+	int spacerPosition = d->Layout->indexOf(d->SpacerWidget);
+    if (data->Alignment & Qt::AlignLeft)
+    {
+        d->Layout->insertWidget(spacerPosition, newButton);
+    }
+    else if (data->Alignment & Qt::AlignRight)
+    {
+        d->Layout->insertWidget(spacerPosition + 1, newButton);
+    }
+    else
+    {
+        d->Layout->addWidget(newButton);
+    }
+    QObject::connect(newButton, &QToolButton::clicked, data->OnClicked);
+    QObject::connect(
+        newButton, &QToolButton::toggled, [newButton, data](bool checked) {
+            data->CurrentState = checked ? Qt::Checked : Qt::Unchecked;
+        });
+}
+
+void CDockAreaTitleBar::removeButtons(ads::CDockWidget* source)
+{
+    auto custButtons = buttons(source).first;
+    for (auto custButton : source->customButtons())
+    {
+        custButton->CurrentButton = nullptr;
+    }
+    for (auto custButton : custButtons)
+    {
+        custButton->deleteLater();
+        d->Layout->removeWidget(custButton);
+        int index = d->CustomButtons.indexOf(custButton);
+        d->CustomButtons.erase(d->CustomButtons.begin() + index);
+    }
+}
+
+void CDockAreaTitleBar::removeButton(ads::CDockWidget* source, ads::CDockWidget::CustomButtonData* bData)
+{
+	int index = -1;
+	int i = 0;
+	auto custButtons = buttons(source).first;
+	for (auto custButton : source->customButtons())
+	{
+		if (custButton == bData)
+		{
+			index = i;
+			custButton->CurrentButton = nullptr;
+		}
+		i++;
+	}
+	auto custTitButton = custButtons[i];
+	custTitButton->deleteLater();
+	d->Layout->removeWidget(custTitButton);
+	index = d->CustomButtons.indexOf(custTitButton);
+	d->CustomButtons.erase(d->CustomButtons.begin() + index);
+}
+
 
 //============================================================================
 int CDockAreaTitleBar::indexOf(QWidget* widget) const

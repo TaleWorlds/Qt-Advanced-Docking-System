@@ -66,8 +66,9 @@ static void updateDockWidgetFocusStyle(CDockWidget* DockWidget, bool Focused)
 {
     DockWidget->setProperty("focused", Focused);
     DockWidget->tabWidget()->setProperty("focused", Focused);
-    DockWidget->tabWidget()->updateStyle();
-    internal::repolishStyle(DockWidget);
+	DockWidget->tabWidget()->updateStyle();
+	internal::repolishStyle(DockWidget);
+	DockWidget->tabWidget()->update();
 }
 
 //===========================================================================
@@ -75,7 +76,9 @@ static void updateDockAreaFocusStyle(CDockAreaWidget* DockArea, bool Focused)
 {
     DockArea->setProperty("focused", Focused);
     internal::repolishStyle(DockArea);
-    internal::repolishStyle(DockArea->titleBar());
+	internal::repolishStyle(DockArea->titleBar());
+	DockArea->titleBar()->update();
+	DockArea->update();
 }
 
 //===========================================================================

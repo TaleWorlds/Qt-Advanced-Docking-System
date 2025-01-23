@@ -28,6 +28,7 @@
 //============================================================================
 #include "DockAreaWidget.h"
 
+#include <QApplication>
 #include <QDebug>
 #include <QList>
 #include <QMenu>
@@ -45,6 +46,7 @@
 #include "DockAreaTitleBar.h"
 #include "DockComponentsFactory.h"
 #include "DockContainerWidget.h"
+#include "DockFocusController.h"
 #include "DockManager.h"
 #include "DockOverlay.h"
 #include "DockSplitter.h"
@@ -100,7 +102,7 @@ public:
      */
     void insertWidget(int index, QWidget* Widget)
     {
-        Widget->setParent(nullptr);
+        // Widget->setParent(nullptr);
         if (index < 0)
         {
             index = m_Widgets.count();
@@ -341,17 +343,6 @@ void DockAreaWidgetPrivate::updateTitleBarButtonStates()
         UpdateTitleBarButtons = true;
         return;
     }
-    bool has_add = false;
-    for (int i = 0; i < _this->dockWidgetsCount(); i++)
-    {
-        auto DW = dockWidgetAt(i);
-        if (DW && DW->features().testFlag(CDockWidget::DockWidgetHasAddButton))
-        {
-            has_add = true;
-            break;
-        }
-    }
-
     if (_this->isAutoHide())
     {
         if (CDockManager::testAutoHideConfigFlag(
@@ -370,7 +361,6 @@ void DockAreaWidgetPrivate::updateTitleBarButtonStates()
         TitleBar->button(TitleBarButtonClose)
             ->setEnabled(
                 _this->features().testFlag(CDockWidget::DockWidgetClosable));
-        TitleBar->button(TitleBarButtonAdd)->setVisible(has_add);
     }
     TitleBar->button(TitleBarButtonAutoHide)
         ->setEnabled(_this->features().testFlag(CDockWidget::DockWidgetPinnable));
@@ -381,20 +371,11 @@ void DockAreaWidgetPrivate::updateTitleBarButtonStates()
 //============================================================================
 void DockAreaWidgetPrivate::updateTitleBarButtonVisibility(bool IsTopLevel)
 {
+    TitleBar->setUpdatesEnabled(false);
     auto* const container = _this->dockContainer();
     if (!container)
     {
         return;
-    }
-    bool has_add = false;
-    for (int i = 0; i < _this->dockWidgetsCount(); i++)
-    {
-        auto DW = dockWidgetAt(i);
-        if (DW && DW->features().testFlag(CDockWidget::DockWidgetHasAddButton))
-        {
-            has_add = true;
-            break;
-        }
     }
     bool IsAutoHide = _this->isAutoHide();
     if (IsAutoHide)
@@ -405,30 +386,67 @@ void DockAreaWidgetPrivate::updateTitleBarButtonVisibility(bool IsTopLevel)
         TitleBar->button(TitleBarButtonAutoHide)->setVisible(true);
         TitleBar->button(TitleBarButtonUndock)->setVisible(false);
         TitleBar->button(TitleBarButtonTabsMenu)->setVisible(false);
-        TitleBar->button(TitleBarButtonAdd)->setVisible(false);
+        auto DW = dockWidgetAt(0);
+        if (DW)
+        {
+            auto temp = TitleBar->buttons(DW);
+            for (auto custButton : temp.second)
+            {
+                custButton->setVisible(false);
+            }
+            for (auto custButton : temp.first)
+            {
+                custButton->setVisible(true);
+            }
+        }
     }
     else if (IsTopLevel)
     {
         TitleBar->button(TitleBarButtonClose)
-            ->setVisible(!container->isFloating());
+            ->setVisible(!container->isFloating() && CDockManager::testConfigFlag(CDockManager::DockAreaHasCloseButton));
         TitleBar->button(TitleBarButtonAutoHide)
             ->setVisible(!container->isFloating());
         // Undock and tabs should never show when auto hidden
         TitleBar->button(TitleBarButtonUndock)
             ->setVisible(!container->isFloating());
         TitleBar->button(TitleBarButtonTabsMenu)->setVisible(true);
-        TitleBar->button(TitleBarButtonAdd)->setVisible(has_add);
+        auto DW = _this->currentDockWidget();
+        if (DW)
+        {
+            auto temp = TitleBar->buttons(DW);
+            for (auto custButton : temp.second)
+            {
+                custButton->setVisible(false);
+            }
+            for (auto custButton : temp.first)
+            {
+                custButton->setVisible(true);
+            }
+        }
     }
     else
     {
-        TitleBar->button(TitleBarButtonClose)->setVisible(true);
+        TitleBar->button(TitleBarButtonClose)->setVisible(CDockManager::testConfigFlag(CDockManager::DockAreaHasCloseButton));
         bool ShowAutoHideButton = CDockManager::testAutoHideConfigFlag(
             CDockManager::DockAreaHasAutoHideButton);
         TitleBar->button(TitleBarButtonAutoHide)->setVisible(ShowAutoHideButton);
         TitleBar->button(TitleBarButtonUndock)->setVisible(true);
         TitleBar->button(TitleBarButtonTabsMenu)->setVisible(true);
-        TitleBar->button(TitleBarButtonAdd)->setVisible(has_add);
+        auto DW = _this->currentDockWidget();
+        if (DW)
+        {
+            auto temp = TitleBar->buttons(DW);
+            for (auto custButton : temp.second)
+            {
+                custButton->setVisible(false);
+            }
+            for (auto custButton : temp.first)
+            {
+                custButton->setVisible(true);
+            }
+        }
     }
+    TitleBar->setUpdatesEnabled(true);
 }
 
 //============================================================================
@@ -541,6 +559,11 @@ void CDockAreaWidget::insertDockWidget(int index, CDockWidget* DockWidget,
                                             // state, added to keep the close
                                             // state consistent
     }
+    auto buttonDatas = DockWidget->customButtons();
+    for (auto buttonData : buttonDatas)
+    {
+        d->TitleBar->addButton(buttonData, DockWidget);
+    }
     // If this dock area is hidden, then we need to make it visible again
     // by calling DockWidget->toggleViewInternal(true);
     if (!this->isVisible() && d->ContentsLayout->count() > 1
@@ -607,7 +630,7 @@ void CDockAreaWidget::removeDockWidget(CDockWidget* DockWidget)
         // contain any visible content
         hideAreaWithNoVisibleContent();
     }
-
+    d->TitleBar->removeButtons(DockWidget);
     d->updateTitleBarButtonStates();
     updateTitleBarVisibility();
     d->updateMinimumSizeHint();
@@ -616,7 +639,6 @@ void CDockAreaWidget::removeDockWidget(CDockWidget* DockWidget)
     {
         TopLevelDockWidget->emitTopLevelChanged(true);
     }
-
 #if (ADS_DEBUG_LEVEL > 0)
     DockContainer->dumpLayout();
 #endif
@@ -728,6 +750,11 @@ void CDockAreaWidget::setCurrentIndex(int index)
     d->ContentsLayout->setCurrentIndex(index);
     d->ContentsLayout->currentWidget()->show();
     Q_EMIT currentChanged(index);
+    if (d->TitleBar->hasCustomButtons())
+    {
+        bool isTopLevel = isTopLevelArea();
+        updateTitleBarButtonVisibility(isTopLevel);
+    }
 }
 
 //============================================================================
@@ -739,7 +766,7 @@ int CDockAreaWidget::currentIndex() const
 //============================================================================
 QRect CDockAreaWidget::titleBarGeometry() const
 {
-    return d->TitleBar->geometry();
+	return d->TitleBar->geometry();
 }
 
 //============================================================================
@@ -871,13 +898,6 @@ void CDockAreaWidget::updateTitleBarVisibility()
                    && openDockWidgetsCount() == 1);
         auto DW = openedDockWidgets().isEmpty() ? nullptr :
                                                   openedDockWidgets().at(0);
-        // Always show the title bar if the single opened dock widget has add
-        // button functionality
-        if (openDockWidgetsCount() == 1 && DW
-            && DW->features().testFlag(CDockWidget::DockWidgetHasAddButton))
-        {
-            Hidden = false;
-        }
         Hidden &= !IsAutoHide;  // Titlebar must always be visible when auto
                                 // hidden so it can be dragged
         d->TitleBar->setVisible(!Hidden);
@@ -886,6 +906,9 @@ void CDockAreaWidget::updateTitleBarVisibility()
     if (isAutoHideFeatureEnabled())
     {
         d->TitleBar->showAutoHideControls(IsAutoHide);
+    }
+    if (isAutoHideFeatureEnabled() || d->TitleBar->hasCustomButtons())
+    {
         updateTitleBarButtonVisibility(Container->topLevelDockArea() == this);
     }
 }
@@ -912,6 +935,11 @@ void CDockAreaWidget::updateAutoHideButtonCheckState()
 void CDockAreaWidget::updateTitleBarButtonVisibility(bool IsTopLevel) const
 {
     d->updateTitleBarButtonVisibility(IsTopLevel);
+}
+
+bool CDockAreaWidget::focusNextPrevChild(bool next)
+{
+	return Super::focusNextPrevChild(next);
 }
 
 //============================================================================
@@ -1010,6 +1038,8 @@ bool CDockAreaWidget::restoreState(CDockingStateReader& s,
         }
 
         s.skipCurrentElement();
+        Q_EMIT DockManager->aboutToRestoreDockWidget(ObjectName.toString(),
+                                                     Testing);
         CDockWidget* DockWidget =
             DockManager->findDockWidget(ObjectName.toString());
         if (!DockWidget || Testing)
@@ -1532,7 +1562,7 @@ void CDockAreaWidget::fetchIndependentCount()
     for (int j = 0; j < dockWidgetsCount(); j++)
     {
         auto DW = dockWidget(j);
-        if (DW->features().testFlag(CDockWidget::DockWidgetIndependent))
+        if (DW && DW->features().testFlag(CDockWidget::DockWidgetIndependent))
         {
             d->IndependentDWCount++;
         }

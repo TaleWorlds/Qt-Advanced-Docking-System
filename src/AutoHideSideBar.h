@@ -69,6 +69,8 @@ private:
     friend CDockContainerWidget;
 
 protected:
+
+	virtual void wheelEvent(QWheelEvent* Event) override;
     virtual bool eventFilter(QObject* watched, QEvent* event) override;
 
     /**

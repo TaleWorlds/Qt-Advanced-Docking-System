@@ -70,7 +70,7 @@ struct ResizeHandlePrivate
      */
     QRect doResizing(QMouseEvent* e, bool ForceResize = false);
 
-    QRect newGeometry(QMouseEvent* e, int& outRubberBandPos);
+	QRect newGeometry(QMouseEvent* e, int& outRubberBandPos);
 };
 // struct ResizeHandlePrivate
 
@@ -111,8 +111,7 @@ QRect ResizeHandlePrivate::doResizing(QMouseEvent* e, bool ForceResize)
     if (HandlePosition & Qt::TopEdge || HandlePosition & Qt::LeftEdge)
     {
         QSize DeltaSize = OldGeometry.size() - NewGeometry.size();
-        NewGeometry.moveTo(OldGeometry.topLeft()
-                           + QPoint(DeltaSize.width(), DeltaSize.height()));
+        NewGeometry.moveTo(OldGeometry.topLeft() + QPoint(DeltaSize.width(), DeltaSize.height()));
     }
     else
     {
@@ -230,14 +229,14 @@ void CResizeHandle::mouseReleaseEvent(QMouseEvent* e)
     {
         int unused;
         QRect NewGeo = d->newGeometry(e, unused);
-        if (orientation() == Qt::Horizontal)
+		if (orientation() == Qt::Horizontal)
         {
             NewGeo.setWidth(d->HandleWidth);
-        }
-        else
+		}
+		else
         {
             NewGeo.setHeight(d->HandleWidth);
-        }
+		}
         QPoint p_ = e->globalPosition().toPoint();
         CAutoHideDockContainer* ahdc =
             qobject_cast<CAutoHideDockContainer*>(d->Target);

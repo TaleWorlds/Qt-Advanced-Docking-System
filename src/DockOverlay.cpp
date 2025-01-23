@@ -46,8 +46,6 @@
 
 namespace ads
 {
-static const int AutoHideAreaWidth = 32;
-static const int AutoHideAreaMouseZone = 8;
 static const int InvalidTabIndex = -2;
 
 /**
@@ -117,19 +115,18 @@ struct DockOverlayCrossPrivate
         switch (ColorIndex)
         {
         case CDockOverlayCross::FrameColor:
-            return pal.color(QPalette::Active, QPalette::Window);
-        case CDockOverlayCross::WindowBackgroundColor:
-            return pal.color(QPalette::Active, QPalette::Base);
+            return pal.color(QPalette::Active, QPalette::Highlight);
+		case CDockOverlayCross::WindowBackgroundColor:
+			return pal.color(QPalette::Active, QPalette::Window);
         case CDockOverlayCross::OverlayColor:
         {
-            QColor Color = pal.color(QPalette::Active, QPalette::Window);
+            QColor Color = pal.color(QPalette::Active, QPalette::Highlight);
             Color.setAlpha(64);
             return Color;
         }
         break;
-
         case CDockOverlayCross::ArrowColor:
-            return pal.color(QPalette::Active, QPalette::Base);
+			return pal.color(QPalette::Active, QPalette::Highlight);
         case CDockOverlayCross::ShadowColor: return QColor(0, 0, 0, 64);
         default: return QColor();
         }
@@ -369,7 +366,7 @@ int DockOverlayPrivate::sideBarOverlaySize(SideBarLocation sideBarLocation)
     auto SideBar = Container->autoHideSideBar(sideBarLocation);
     if (!SideBar || !SideBar->isVisibleTo(Container))
     {
-        return AutoHideAreaWidth;
+        return internal::AutoHideAreaWidth;
     }
     else
     {
@@ -385,26 +382,26 @@ int DockOverlayPrivate::sideBarMouseZone(SideBarLocation sideBarLocation)
     auto SideBar = Container->autoHideSideBar(sideBarLocation);
     if (!SideBar || !SideBar->isVisibleTo(Container))
     {
-        return AutoHideAreaMouseZone;
+		return internal::AutoHideAreaMouseZone;
     }
     else
     {
-        return (SideBar->orientation() == Qt::Horizontal) ? SideBar->height() :
-                                                            SideBar->width();
-    }
+		return (SideBar->orientation() == Qt::Horizontal) ? SideBar->height() + internal::AutoHideAreaVisibleExtraMouseZone
+														  : SideBar->width() + internal::AutoHideAreaVisibleExtraMouseZone;
+	}
 }
 
 //============================================================================
 CDockOverlay::CDockOverlay(QWidget* parent, eMode Mode)
-    : QFrame(parent), d(new DockOverlayPrivate(this))
+    : QFrame(nullptr), d(new DockOverlayPrivate(this))
 {
     d->Mode = Mode;
     d->Cross = new CDockOverlayCross(this);
 #if defined(Q_OS_UNIX) && !defined(Q_OS_MACOS)
-    setWindowFlags(Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint
-                   | Qt::X11BypassWindowManagerHint);
+	setWindowFlags(Qt::ToolTip | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint
+		| Qt::X11BypassWindowManagerHint);
 #else
-    setWindowFlags(Qt::Tool | Qt::FramelessWindowHint);
+	setWindowFlags(Qt::ToolTip | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
 #endif
     setWindowOpacity(1);
     setWindowTitle("DockOverlay");
@@ -462,10 +459,21 @@ DockWidgetArea CDockOverlay::dropAreaUnderCursor() const
     if (Result != InvalidDockWidgetArea)
     {
         return Result;
-    }
+	}
 
-    auto CursorPos = QCursor::pos();
-    auto DockArea = qobject_cast<CDockAreaWidget*>(d->TargetWidget.data());
+	auto CursorPos = QCursor::pos();
+	auto DockArea = qobject_cast<CDockAreaWidget*>(d->TargetWidget.data());
+
+	// since the dock area title bar is smaller than the auto hide, we prioritize this
+	if (DockArea && DockArea->allowedAreas().testFlag(CenterDockWidgetArea) && allowedAreas().testFlag(CenterDockWidgetArea)
+		&& !DockArea->titleBar()->isHidden()
+		&& DockArea->titleBarGeometry().contains(DockArea->mapFromGlobal(CursorPos)))
+	{
+		auto TabBar = DockArea->titleBar()->tabBar();
+		d->TabIndex = TabBar->tabInsertIndexAt(TabBar->mapFromGlobal(CursorPos));
+		return CenterDockWidgetArea;
+	}
+
     if (!DockArea
         && CDockManager::autoHideConfigFlags().testFlag(
             CDockManager::AutoHideFeatureEnabled))
@@ -511,18 +519,7 @@ DockWidgetArea CDockOverlay::dropAreaUnderCursor() const
     {
         return Result;
     }
-
-    if (DockArea->allowedAreas().testFlag(CenterDockWidgetArea)
-        && !DockArea->titleBar()->isHidden()
-        && DockArea->titleBarGeometry().contains(
-            DockArea->mapFromGlobal(CursorPos)))
-    {
-        auto TabBar = DockArea->titleBar()->tabBar();
-        d->TabIndex = TabBar->tabInsertIndexAt(TabBar->mapFromGlobal(CursorPos));
-        return CenterDockWidgetArea;
-    }
-
-    return Result;
+	return Result;
 }
 
 //============================================================================
@@ -553,7 +550,16 @@ DockWidgetArea CDockOverlay::showOverlay(QWidget* target)
         DockWidgetArea da = dropAreaUnderCursor();
         if (da != d->LastLocation)
         {
-            repaint();
+			setUpdatesEnabled(false);
+			d->Cross->setUpdatesEnabled(false);
+			hide();
+			d->Cross->updateOverlayIcons();
+			resize(target->size());
+			QPoint TopLeft = target->mapToGlobal(target->rect().topLeft());
+			move(TopLeft);
+			show();
+			d->Cross->setUpdatesEnabled(true);
+			setUpdatesEnabled(true);
             d->LastLocation = da;
         }
         return da;
@@ -563,13 +569,16 @@ DockWidgetArea CDockOverlay::showOverlay(QWidget* target)
     d->LastLocation = InvalidDockWidgetArea;
 
     // Move it over the target.
-    hide();
+	setUpdatesEnabled(false);
+	d->Cross->setUpdatesEnabled(false);
+	hide();
+	d->Cross->updateOverlayIcons();
     resize(target->size());
     QPoint TopLeft = target->mapToGlobal(target->rect().topLeft());
     move(TopLeft);
-    show();
-    d->Cross->updatePosition();
-    d->Cross->updateOverlayIcons();
+	show();
+	d->Cross->setUpdatesEnabled(true);
+	setUpdatesEnabled(true);
     return dropAreaUnderCursor();
 }
 
@@ -630,7 +639,7 @@ void CDockOverlay::paintEvent(QPaintEvent* event)
     }
 
     QPainter painter(this);
-    QColor Color = palette().color(QPalette::Active, QPalette::Window);
+    QColor Color = palette().color(QPalette::Active, QPalette::Highlight);
     QPen Pen = painter.pen();
     Pen.setColor(Color.darker(120));
     Pen.setStyle(Qt::SolidLine);
@@ -722,14 +731,14 @@ QPoint DockOverlayCrossPrivate::areaGridPosition(const DockWidgetArea area)
 
 //============================================================================
 CDockOverlayCross::CDockOverlayCross(CDockOverlay* overlay)
-    : QWidget(overlay->parentWidget()), d(new DockOverlayCrossPrivate(this))
+    : QWidget(overlay), d(new DockOverlayCrossPrivate(this))
 {
-    d->DockOverlay = overlay;
+	d->DockOverlay = overlay;
 #if defined(Q_OS_UNIX) && !defined(Q_OS_MACOS)
-    setWindowFlags(Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint
-                   | Qt::X11BypassWindowManagerHint);
+	setWindowFlags(Qt::ToolTip | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint
+		| Qt::X11BypassWindowManagerHint);
 #else
-    setWindowFlags(Qt::Tool | Qt::FramelessWindowHint);
+	setWindowFlags(Qt::ToolTip | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
 #endif
     setWindowTitle("DockOverlayCross");
     setAttribute(Qt::WA_TranslucentBackground);
@@ -774,7 +783,7 @@ void CDockOverlayCross::setupOverlayCross(CDockOverlay::eMode Mode)
 //============================================================================
 void CDockOverlayCross::updateOverlayIcons()
 {
-    if (windowHandle()->devicePixelRatio() == d->LastDevicePixelRatio)
+	if (windowHandle() && windowHandle()->devicePixelRatio() == d->LastDevicePixelRatio)
     {
         return;
     }

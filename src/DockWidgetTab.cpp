@@ -77,6 +77,7 @@ struct DockWidgetTabPrivate
     QSpacerItem* IconTextSpacer;
     QPoint TabDragStartPosition;
     QSize IconSize;
+    bool MouseOver = false;
 
     /**
      * Private data constructor
@@ -259,9 +260,12 @@ void DockWidgetTabPrivate::createLayout()
 
     CloseButton = createCloseButton();
     CloseButton->setObjectName("tabCloseButton");
+    CloseButton->setContentsMargins(0, 0, 0, 0);
     internal::setButtonIcon(CloseButton, QStyle::SP_TitleBarCloseButton,
                             TabCloseIcon);
+    CloseButton->setIconSize({16, 16});
     CloseButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    CloseButton->setFixedSize({17, 17});
     CloseButton->setFocusPolicy(Qt::NoFocus);
     updateCloseButtonSizePolicy();
     internal::setToolTip(CloseButton, QObject::tr("Close Tab"));
@@ -277,7 +281,7 @@ void DockWidgetTabPrivate::createLayout()
     _this->setLayout(Layout);
     Layout->addWidget(TitleLabel, 1);
     Layout->addSpacing(Spacing);
-    Layout->addWidget(CloseButton);
+    Layout->addWidget(CloseButton, 0, Qt::AlignVCenter);
     Layout->addSpacing(qRound(Spacing * 4.0 / 3.0));
     Layout->setAlignment(Qt::AlignCenter);
 
@@ -351,7 +355,7 @@ bool DockWidgetTabPrivate::startFloating(eDragState DraggingState)
         this->FloatingWidget = FloatingWidget;
         qApp->postEvent(
             DockWidget,
-            new QEvent((QEvent::Type)internal::DockedWidgetDragStartEvent));
+            new internal::CFloatingWidgetDragStartEvent((QEvent::Type)internal::DockedWidgetDragStartEvent, DockWidget));
     }
     else
     {
@@ -370,10 +374,6 @@ CDockWidgetTab::CDockWidgetTab(CDockWidget* DockWidget, QWidget* parent)
     d->DockWidget = DockWidget;
     d->createLayout();
     setFocusPolicy(Qt::NoFocus);
-    /*if (CDockManager::testConfigFlag(CDockManager::FocusHighlighting))
-    {
-        setFocusPolicy(Qt::ClickFocus);
-    }*/
 }
 
 //============================================================================
@@ -381,6 +381,12 @@ CDockWidgetTab::~CDockWidgetTab()
 {
     ADS_PRINT("~CDockWidgetTab()");
     delete d;
+}
+
+//============================================================================
+bool CDockWidgetTab::mouseOver() const
+{
+    return d->MouseOver;
 }
 
 //============================================================================
@@ -584,6 +590,22 @@ void CDockWidgetTab::contextMenuEvent(QContextMenuEvent* ev)
                                 SIGNAL(closeOtherTabsRequested()));
     }
     Menu.exec(ev->globalPos());
+}
+
+//============================================================================
+void CDockWidgetTab::enterEvent(QEnterEvent* ev)
+{
+    d->MouseOver = true;
+    QFrame::enterEvent(ev);
+    update();
+}
+
+//============================================================================
+void CDockWidgetTab::leaveEvent(QEvent* ev)
+{
+    d->MouseOver = false;
+    QFrame::leaveEvent(ev);
+    update();
 }
 
 //============================================================================

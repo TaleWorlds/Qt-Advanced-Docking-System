@@ -105,7 +105,7 @@ public:
      */
     void setFloatingWidget(CFloatingDockContainer* parent);
 
-signals:
+Q_SIGNALS:
     /**
      * This signal is emitted, if the close button is clicked.
      */

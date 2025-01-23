@@ -1,3 +1,4 @@
+#pragma once
 #ifndef ads_globalsH
 #define ads_globalsH
 /*******************************************************************************
@@ -56,7 +57,7 @@ QT_FORWARD_DECLARE_CLASS(QAbstractButton)
 
 // Define ADS_DEBUG_PRINT to enable a lot of debug output
 #ifndef ADS_DEBUG_PRINT
-// #    define ADS_DEBUG_PRINT
+#define ADS_DEBUG_PRINT
 #endif
 #ifdef ADS_DEBUG_PRINT
 #    define ADS_PRINT(s) qDebug() << s
@@ -103,12 +104,11 @@ enum eTabIndex
     TabInvalidIndex = -2
 };
 
-enum TitleBarButton
+enum TitleBarButton : int64_t
 {
     TitleBarButtonTabsMenu,
     TitleBarButtonUndock,
     TitleBarButtonClose,
-    TitleBarButtonAdd,
     TitleBarButtonAutoHide,
     TitleBarButtonMinimize
 };
@@ -135,6 +135,9 @@ enum eIcon
     DockAreaUndockIcon,  //!< DockAreaUndockIcon
     DockAreaCloseIcon,   //!< DockAreaCloseIcon
     DockAreaMinimizeIcon,
+	MaximizeIcon,
+	NormalIcon,
+	AddIcon,
 
     IconCount,  //!< just a delimiter for range checks
 };
@@ -170,6 +173,20 @@ static const char* const DirtyProperty = "dirty";
 static const char* const LocationProperty = "Location";
 extern const int FloatingWidgetDragStartEvent;
 extern const int DockedWidgetDragStartEvent;
+extern const int AutoHideAreaWidth;
+extern const int AutoHideAreaMouseZone;
+extern const int AutoHideAreaVisibleExtraMouseZone;
+
+class CFloatingWidgetDragStartEvent : public QEvent
+{
+	Q_DECL_EVENT_COMMON(CFloatingWidgetDragStartEvent)
+public:
+	explicit CFloatingWidgetDragStartEvent(QEvent::Type type, QWidget* contnt);
+
+	QWidget* content() const;
+private:
+	QWidget* mContent;
+};
 
 #if defined(Q_OS_UNIX) && !defined(Q_OS_MACOS)
 // Utils to directly communicate with the X server

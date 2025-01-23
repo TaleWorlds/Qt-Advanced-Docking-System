@@ -262,6 +262,7 @@ public:
     virtual unsigned int zOrderWindowIndex() const;
 
     void setZOrderWindowIndex(unsigned int idx);
+	void setZOrderWidgetIndex(unsigned int idx);
 
     /**
      * This function returns true if this container widgets z order index is
@@ -384,6 +385,8 @@ public:
      * Returns the dock manager that owns this container
      */
     CDockManager* dockManager() const;
+public Q_SLOTS:
+	void raise();
 
 Q_SIGNALS:
     /**

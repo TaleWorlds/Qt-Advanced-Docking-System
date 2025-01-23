@@ -32,6 +32,7 @@
 #include <QBoxLayout>
 #include <QElapsedTimer>
 #include <QMenu>
+#include <QToolButton>
 
 #include "AutoHideDockContainer.h"
 #include "AutoHideSideBar.h"
@@ -40,6 +41,7 @@
 #include "DockOverlay.h"
 #include "DockWidget.h"
 #include "FloatingDragPreview.h"
+#include "IconProvider.h"
 
 namespace ads
 {
@@ -52,6 +54,7 @@ struct AutoHideTabPrivate
     CAutoHideTab* _this;
     CDockWidget* DockWidget = nullptr;
     CAutoHideSideBar* SideBar = nullptr;
+    QToolButton* CloseButton = nullptr;
     Qt::Orientation Orientation{Qt::Vertical};
     QElapsedTimer TimeSinceHoverMousePress;
     bool MousePressed = false;
@@ -203,7 +206,7 @@ bool AutoHideTabPrivate::startFloating(eDragState DraggingState)
     this->FloatingWidget = FloatingWidget;
     qApp->postEvent(
         DockWidget,
-        new QEvent((QEvent::Type)internal::DockedWidgetDragStartEvent));
+		new internal::CFloatingWidgetDragStartEvent((QEvent::Type)internal::DockedWidgetDragStartEvent, DockWidget));
 
     return true;
 }
@@ -239,8 +242,20 @@ void CAutoHideTab::removeFromSideBar()
 CAutoHideTab::CAutoHideTab(QWidget* parent)
     : CPushButton(parent), d(new AutoHideTabPrivate(this))
 {
-    setAttribute(Qt::WA_NoMousePropagation);
+    setAttribute(Qt::WA_NoMousePropagation, false);
     setFocusPolicy(Qt::NoFocus);
+    d->CloseButton = new QToolButton(this);
+    QHBoxLayout* layout = new QHBoxLayout(this);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(0);
+    setContentsMargins(0, 0, 0, 0);
+    layout->setAlignment(Qt::AlignRight | Qt::AlignTop);
+	layout->addWidget(d->CloseButton); 
+    d->CloseButton->setContentsMargins(0, 0, 0, 0);
+    d->CloseButton->setIcon(CDockManager::iconProvider().customIcon(DockAreaCloseIcon));
+    d->CloseButton->setFixedSize(10, 10);
+    d->CloseButton->setAutoRaise(true);
+    QObject::connect(d->CloseButton, &QToolButton::clicked, this, &CAutoHideTab::onCloseButtonClicked);
 }
 
 //============================================================================
@@ -401,6 +416,11 @@ void CAutoHideTab::onAutoHideToActionClicked()
     d->DockWidget->setAutoHide(true, (SideBarLocation)Location);
 }
 
+void CAutoHideTab::onCloseButtonClicked()
+{
+    d->DockWidget->requestCloseDockWidget();
+}
+
 //============================================================================
 void CAutoHideTab::mousePressEvent(QMouseEvent* ev)
 {
@@ -464,7 +484,10 @@ void CAutoHideTab::mouseReleaseEvent(QMouseEvent* ev)
         default: break;  // do nothing
         }
     }
-
+    else if (ev->button() == Qt::MiddleButton)
+    {
+        d->DockWidget->requestCloseDockWidget();
+    }
     Super::mouseReleaseEvent(ev);
 }
 
@@ -531,6 +554,24 @@ int CAutoHideTab::tabIndex() const
     }
 
     return d->SideBar->indexOfTab(*this);
+}
+
+QSize CAutoHideTab::sizeHint() const
+{
+	auto inheritedSize = Super::sizeHint(); 
+    QString s(text());
+	bool empty = s.isEmpty();
+    if (empty)
+	{
+		s = QStringLiteral("XXXX");
+    }
+	QFontMetrics fm = fontMetrics();
+	QSize sz = fm.size(Qt::TextShowMnemonic, s);
+    if (sz.width() >= 40)
+	{
+		inheritedSize.setWidth(inheritedSize.width() + 12);
+    }
+    return inheritedSize;
 }
 
 }  // namespace ads

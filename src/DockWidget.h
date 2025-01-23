@@ -47,6 +47,7 @@ class CFloatingDockContainer;
 class CAutoHideTab;
 class CAutoHideDockContainer;
 class CAutoHideSideBar;
+class CTitleBarButton;
 
 /**
  * The QDockWidget class provides a widget that can be docked inside a
@@ -146,8 +147,22 @@ protected:
      */
     bool closeDockWidgetInternal(bool ForceClose = false);
 
+	bool eventFilter(QObject* watched, QEvent* event) override;
+	virtual bool focusNextPrevChild(bool next) override;
 public:
     using Super = QFrame;
+
+	struct CustomButtonData
+    {
+        QString Text;
+        QIcon Icon;
+        QString Tooltip;
+        Qt::CheckState InitialState;
+        Qt::CheckState CurrentState;
+        CTitleBarButton* CurrentButton;
+        std::function<void()> OnClicked;
+        Qt::Alignment Alignment;
+    };
 
     enum DockWidgetFeature
     {
@@ -178,11 +193,6 @@ public:
                                         ///< when it is floated, causing the
                                         ///< system window manager to display is
                                         ///< as an independent window
-        DockWidgetHasAddButton =
-            0x400,  ///!<Add button next to the dock area of this dock widget, which fires a
-        //!<signal to dock manager along with the dock area it belongs to. The users can then programatically control this
-        //!<signal with a slot; to open a dialog or add a dock widget etc. If the signal is
-        //!<not connected, the button wont do anything
         DockWidgetPinnable = 0x200,  ///< dock widget can be pinned and added to
                                      ///< an auto hide dock container
         DefaultDockWidgetFeatures = DockWidgetClosable | DockWidgetMovable
@@ -597,6 +607,24 @@ public:
      * the true is returned
      */
     bool isCurrentTab() const;
+
+    /**
+     * Adds a checkable button whose contents will be decided on its icon
+	 * If button is unchecked, the off state of the icon will be shown
+	 * if it is checked, the on state will be shown
+     */
+    void addCustomButton(const QIcon& icon, bool initialCheckState,
+                                      const QString& tooltip, Qt::Alignment align,
+                         const std::function<void()>& onClicked);
+    /**
+     * Adds a button that is not checkable. The icon will be the same at all times
+     */
+    void addCustomButton(const QIcon& icon, const QString& tooltip, Qt::Alignment align,
+                         const std::function<void()>& onClicked);
+
+    const QList<CDockWidget::CustomButtonData*>& customButtons();
+
+    void removeCustomButton(CDockWidget::CustomButtonData* bData);
 
 public:  // reimplements QFrame -----------------------------------------------
     /**
