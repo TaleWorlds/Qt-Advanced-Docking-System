@@ -242,7 +242,6 @@ void CResizeHandle::mouseReleaseEvent(QMouseEvent* e)
             qobject_cast<CAutoHideDockContainer*>(d->Target);
         if (d->HasOverrideCursor && !NewGeo.contains(ahdc->mapFromGlobal(p_)))
         {
-            QApplication::restoreOverrideCursor();
             d->HasOverrideCursor = false;
         }
     }
@@ -283,14 +282,13 @@ bool CResizeHandle::eventFilter(QObject* receiver, QEvent* event)
                 case Qt::TopEdge:  // fall through
                 case Qt::BottomEdge: s = Qt::SizeVerCursor; break;
                 }
-                QApplication::setOverrideCursor(s);
+                setCursor(s);
                 d->HasOverrideCursor = true;
             }
             else if (d->HasOverrideCursor && !(me->buttons() & Qt::LeftButton)
                      && !rect().contains(
                          mapFromGlobal(me->globalPosition().toPoint())))
             {
-                QApplication::restoreOverrideCursor();
                 d->HasOverrideCursor = false;
             }
         }

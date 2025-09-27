@@ -43,6 +43,11 @@ public:
     virtual ~CIconProvider();
 
     /**
+     * Clear the icon provider db
+     */
+    void clear();
+
+    /**
      * The function returns a custom icon if one is registered and a null Icon
      * if no custom icon is registered
      */

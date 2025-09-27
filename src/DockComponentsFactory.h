@@ -1,3 +1,4 @@
+#pragma once
 #ifndef DockComponentsFactoryH
 #define DockComponentsFactoryH
 //============================================================================
@@ -84,10 +85,7 @@ public:
 /**
  * Convenience function to ease factory instance access
  */
-inline const CDockComponentsFactory* componentsFactory()
-{
-    return CDockComponentsFactory::factory();
-}
+const CDockComponentsFactory* componentsFactory();
 
 }  // namespace ads
 

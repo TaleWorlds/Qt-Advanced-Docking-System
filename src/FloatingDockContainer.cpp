@@ -28,6 +28,15 @@
 //============================================================================
 #include "FloatingDockContainer.h"
 
+#include "DockAreaTitleBar.h"
+#include "DockAreaWidget.h"
+#include "DockContainerWidget.h"
+#include "DockManager.h"
+#include "DockOverlay.h"
+#include "DockSplitter.h"
+#include "DockWidget.h"
+#include "DockingStateReader.h"
+
 #include <QAbstractButton>
 #include <QAction>
 #include <QApplication>
@@ -44,33 +53,22 @@
 #include <QTimer>
 #include <QWindow>
 #include <QXmlStreamWriter>
-
 #include <iostream>
 
-#include "DockAreaTitleBar.h"
-#include "DockAreaWidget.h"
-#include "DockContainerWidget.h"
-#include "DockManager.h"
-#include "DockOverlay.h"
-#include "DockSplitter.h"
-#include "DockWidget.h"
-#include "DockingStateReader.h"
-
 #ifdef Q_OS_WIN
-#    include <windows.h>
-#    ifdef _MSC_VER
-#        pragma comment(lib, "User32.lib")
-#    endif
+#include <windows.h>
+#ifdef _MSC_VER
+#pragma comment(lib, "User32.lib")
 #endif
-#include "FloatingWidgetTitleBar.h"
+#endif
 #ifdef Q_OS_LINUX
-#    include <xcb/xcb.h>
+#include <xcb/xcb.h>
 #endif
 
 namespace ads
 {
 #ifdef Q_OS_WIN
-#    if 0  // set to 1 if you need this function for debugging
+#if 0 // set to 1 if you need this function for debugging
 	/**
 	 * Just for debugging to convert windows message identifiers to strings
 	 */
@@ -363,7 +361,7 @@ namespace ads
 
 		return "unknown WM_ message";
 	}
-#    endif
+#endif
 #endif
 
 // static unsigned int zOrderCounterFloating = 0;
@@ -372,314 +370,302 @@ namespace ads
  */
 struct FloatingDockContainerPrivate
 {
-    /// <summary>
-    /// Cursor direction relative to the floating window
-    /// </summary>
-    enum class eDirection
-    {
-        UP = 0,
-        DOWN = 1,
-        LEFT,
-        RIGHT,
-        LEFTTOP,
-        LEFTBOTTOM,
-        RIGHTBOTTOM,
-        RIGHTTOP,
-        NONE
-    };
-    bool LeftMBPressed;
-    eDirection CursorDirection;
-    int ResizeRegionPadding;
-    QPoint DragStartPosition;
-    QMargins TransparentMargins;
-    CFloatingDockContainer* _this;
-    CDockContainerWidget* DockContainer;
-    QPointer<CDockManager> DockManager;
-    eDragState DraggingState = DraggingInactive;
-    QPoint DragStartMousePosition;
-    CDockContainerWidget* DropContainer = nullptr;
+	/// <summary>
+	/// Cursor direction relative to the floating window
+	/// </summary>
+	enum class eDirection
+	{
+		UP = 0,
+		DOWN = 1,
+		LEFT,
+		RIGHT,
+		LEFTTOP,
+		LEFTBOTTOM,
+		RIGHTBOTTOM,
+		RIGHTTOP,
+		NONE
+	};
+	CFloatingDockContainer* _this;
+	CDockContainerWidget* DockContainer;
+	QPointer<CDockManager> DockManager;
+	eDragState DraggingState = DraggingInactive;
+	QPoint DragStartMousePosition;
+	CDockContainerWidget* DropContainer = nullptr;
 	CDockContainerWidget* TopContainer = nullptr;
-    CDockAreaWidget* SingleDockArea = nullptr;
-    QPoint DragStartPos;
-    bool Hiding = false;
-    bool NativeCaptionPress = false;
-    bool AutoHideChildren = true;
-    QWidget* MouseEventHandler = nullptr;
-    CFloatingWidgetTitleBar* TitleBar = nullptr;
-    bool IsResizing = false;
-    bool MousePressed = false;
-    QStatusBar* StatusBar = nullptr;
-    CDockOverlay* IndependentDockAreaOverlay = nullptr;
-    CDockOverlay* IndependentContainerOverlay = nullptr;
+	CDockAreaWidget* SingleDockArea = nullptr;
+	QPoint DragStartPos;
+	bool Hiding = false;
+	bool NativeCaptionPress = false;
+	bool AutoHideChildren = true;
+	QWidget* MouseEventHandler = nullptr;
+	bool IsResizing = false;
+	QStatusBar* StatusBar = nullptr;
+	CDockOverlay* IndependentDockAreaOverlay = nullptr;
+	CDockOverlay* IndependentContainerOverlay = nullptr;
 
-    /**
-     * Private data constructor
-     */
-    FloatingDockContainerPrivate(CFloatingDockContainer* _public);
+	/**
+	 * Private data constructor
+	 */
+	FloatingDockContainerPrivate(CFloatingDockContainer* _public);
 
-    void titleMouseReleaseEvent();
-    void updateDropOverlays(const QPoint& GlobalPos);
+	void titleMouseReleaseEvent();
+	void updateDropOverlays(const QPoint& GlobalPos);
 
-    /**
-     * Returns true if the given config flag is set
-     */
-    static bool testConfigFlag(CDockManager::eConfigFlag Flag)
-    {
-        return CDockManager::testConfigFlag(Flag);
-    }
+	/**
+	 * Returns true if the given config flag is set
+	 */
+	static bool testConfigFlag(CDockManager::eConfigFlag Flag)
+	{
+		return CDockManager::testConfigFlag(Flag);
+	}
 
-    /**
-     * Tests is a certain state is active
-     */
-    bool isState(eDragState StateId) const { return StateId == DraggingState; }
+	/**
+	 * Tests is a certain state is active
+	 */
+	bool isState(eDragState StateId) const
+	{
+		return StateId == DraggingState;
+	}
 
-    /**
-     * Sets the dragging state and posts a FloatingWidgetDragStartEvent
-     * if dragging starts
-     */
-    void setState(eDragState StateId)
-    {
-        if (DraggingState == StateId)
-        {
-            return;
-        }
-        DraggingState = StateId;
-        if (DraggingFloatingWidget == DraggingState)
-        {
-            qApp->postEvent(
-                _this,
-                new QEvent((QEvent::Type)internal::FloatingWidgetDragStartEvent));
-        }
+	/**
+	 * Sets the dragging state and posts a FloatingWidgetDragStartEvent
+	 * if dragging starts
+	 */
+	void setState(eDragState StateId)
+	{
+		if (DraggingState == StateId)
+		{
+			return;
+		}
+		DraggingState = StateId;
+		if (DraggingFloatingWidget == DraggingState)
+		{
+			qApp->postEvent(_this, new QEvent((QEvent::Type)internal::FloatingWidgetDragStartEvent));
+		}
 		if (DraggingInactive)
 		{
 			TopContainer = nullptr;
-    }
-    }
+		}
+	}
 
-    void setWindowTitle(const QString& Text)
-    {
-        if (TitleBar)
-        {
-            TitleBar->setTitle(Text);
-        }
-        _this->setWindowTitle(Text);
-    }
+	void setWindowTitle(const QString& Text)
+	{
+		_this->setWindowTitle(Text);
+	}
 
-    /**
-     * Reflect the current dock widget title in the floating widget windowTitle()
-     * depending on the CDockManager::FloatingContainerHasWidgetTitle flag
-     */
-    void reflectCurrentWidget(CDockWidget* CurrentWidget)
-    {
-        // reflect CurrentWidget's title if configured to do so, otherwise display
-        // application name as window title
-        if (testConfigFlag(CDockManager::FloatingContainerHasWidgetTitle))
-        {
-            setWindowTitle(CurrentWidget->windowTitle());
-        }
-        else
-        {
-            setWindowTitle(floatingContainersTitle());
-        }
+	/**
+	 * Reflect the current dock widget title in the floating widget windowTitle()
+	 * depending on the CDockManager::FloatingContainerHasWidgetTitle flag
+	 */
+	void reflectCurrentWidget(CDockWidget* CurrentWidget)
+	{
+		// reflect CurrentWidget's title if configured to do so, otherwise display
+		// application name as window title
+		if (testConfigFlag(CDockManager::FloatingContainerHasWidgetTitle))
+		{
+			setWindowTitle(CurrentWidget->windowTitle());
+		}
+		else
+		{
+			setWindowTitle(floatingContainersTitle());
+		}
 
-        // reflect CurrentWidget's icon if configured to do so, otherwise display
-        // application icon as window icon
-        QIcon CurrentWidgetIcon = CurrentWidget->icon();
-        if (testConfigFlag(CDockManager::FloatingContainerHasWidgetIcon)
-            && !CurrentWidgetIcon.isNull())
-        {
-            _this->setWindowIcon(CurrentWidget->icon());
-        }
-        else
-        {
-            _this->setWindowIcon(QApplication::windowIcon());
-        }
-    }
+		// reflect CurrentWidget's icon if configured to do so, otherwise display
+		// application icon as window icon
+		QIcon CurrentWidgetIcon = CurrentWidget->icon();
+		if (testConfigFlag(CDockManager::FloatingContainerHasWidgetIcon) && !CurrentWidgetIcon.isNull())
+		{
+			_this->setWindowIcon(CurrentWidget->icon());
+		}
+		else
+		{
+			_this->setWindowIcon(QApplication::windowIcon());
+		}
+	}
 
-    /**
-     * Handles escape key press when dragging around the floating widget
-     */
-    void handleEscapeKey();
+	/**
+	 * Handles escape key press when dragging around the floating widget
+	 */
+	void handleEscapeKey();
 
-    /**
-     * Returns the title used by all FloatingContainer that does not
-     * reflect the title of the current dock widget.
-     *
-     * If not title was set with CDockManager::setFloatingContainersTitle(),
-     * it returns QGuiApplication::applicationDisplayName().
-     */
-    static QString floatingContainersTitle()
-    {
-        return CDockManager::floatingContainersTitle();
-    }
+	/**
+	 * Returns the title used by all FloatingContainer that does not
+	 * reflect the title of the current dock widget.
+	 *
+	 * If not title was set with CDockManager::setFloatingContainersTitle(),
+	 * it returns QGuiApplication::applicationDisplayName().
+	 */
+	static QString floatingContainersTitle()
+	{
+		return CDockManager::floatingContainersTitle();
+	}
 };
+
 // struct FloatingDockContainerPrivate
 
 //============================================================================
-FloatingDockContainerPrivate::FloatingDockContainerPrivate(
-    CFloatingDockContainer* _public)
-    : _this(_public)
-{}
+FloatingDockContainerPrivate::FloatingDockContainerPrivate(CFloatingDockContainer* _public)
+	: _this(_public)
+{
+}
 
 //============================================================================
 void FloatingDockContainerPrivate::titleMouseReleaseEvent()
 {
-    setState(DraggingInactive);
-    if (!DropContainer)
-    {
+	setState(DraggingInactive);
+	if (!DropContainer)
+	{
 		_this->containerOverlay()->hideOverlay();
 		_this->dockAreaOverlay()->hideOverlay();
 		DockManager->containerOverlay()->hideOverlay();
 		DockManager->dockAreaOverlay()->hideOverlay();
-        return;
-    }
-    CDockOverlay* areaOverlay = _this->dockAreaOverlay();
-    CDockOverlay* containerOverlay = _this->containerOverlay();
-    auto DockDropArea = areaOverlay->visibleDropAreaUnderCursor();
-    auto ContainerDropArea = containerOverlay->visibleDropAreaUnderCursor();
-    bool target_had_independent =
-        DropContainer ? DropContainer->hasIndependentWidget() : false;
-    if (DropContainer
-        && (DockDropArea != InvalidDockWidgetArea
-            || ContainerDropArea != InvalidDockWidgetArea))
-    {
-        CDockOverlay* Overlay = containerOverlay;
-        if (!Overlay->dropOverlayRect().isValid())
-        {
-            Overlay = areaOverlay;
-        }
-        // Do not resize if we drop into an autohide sidebar area to preserve
-        // the dock area size for the initial size of the auto hide area
-        if (!ads::internal::isSideBarArea(Overlay->dropAreaUnderCursor()))
-        {
-            // Resize the floating widget to the size of the
-            // highlighted drop area rectangle
-            QRect Rect = Overlay->dropOverlayRect();
-            int FrameWidth = (_this->frameSize().width() - _this->rect().width())
-                             / 2;
-            int TitleBarHeight = _this->frameSize().height()
-                                 - _this->rect().height() - FrameWidth;
-            if (Rect.isValid())
-            {
-                QPoint TopLeft = Overlay->mapToGlobal(Rect.topLeft());
-                TopLeft.ry() += TitleBarHeight;
-                _this->setGeometry(
-                    QRect(TopLeft,
-                          QSize(Rect.width(), Rect.height() - TitleBarHeight)));
-            }
-        }
-        DropContainer->dropFloatingWidget(_this, QCursor::pos());
-        DropContainer->fetchIndependentCount();
-        // Case - Existing Drop FDC independence is just changed
-        auto DropFloatingContainer =
-            DropContainer ? DropContainer->floatingWidget() : nullptr;
-        if (DropContainer && DropContainer->isFloating()  // Target is FDC
-            && (ContainerDropArea != InvalidDockWidgetArea
-                || DockDropArea != InvalidDockWidgetArea)  // Target exists
-            && (_this != DropFloatingContainer)  // No update if the widget is
-                                                 // dropped into itself
-        )
-        {
-            // Check if the independence of this floating container changed by
-            // this drop
-            bool target_has_independent = DropContainer->hasIndependentWidget();
-            if (target_has_independent != target_had_independent)
-            {
-                CFloatingDockContainer* RestoredFloatingWidget =
-                    DropFloatingContainer->moveContainerAndDelete();
-                RestoredFloatingWidget->setUpdatesEnabled(true);
-                QTimer::singleShot(100, RestoredFloatingWidget,
-                                   [RestoredFloatingWidget]() {
-                                       RestoredFloatingWidget->activateWindow();
-                                   });
-            }
-        }
-    }
-    containerOverlay->hideOverlay();
-    areaOverlay->hideOverlay();
-    DockManager->containerOverlay()->hideOverlay();
-    DockManager->dockAreaOverlay()->hideOverlay();
+		return;
+	}
+	CDockOverlay* areaOverlay = _this->dockAreaOverlay();
+	CDockOverlay* containerOverlay = _this->containerOverlay();
+	auto DockDropArea = areaOverlay->visibleDropAreaUnderCursor();
+	auto ContainerDropArea = containerOverlay->visibleDropAreaUnderCursor();
+	bool target_had_independent = DropContainer ? DropContainer->hasIndependentWidget() : false;
+	if (DropContainer && (DockDropArea != InvalidDockWidgetArea || ContainerDropArea != InvalidDockWidgetArea))
+	{
+		CDockOverlay* Overlay = containerOverlay;
+		if (!Overlay->dropOverlayRect().isValid())
+		{
+			Overlay = areaOverlay;
+		}
+		// Do not resize if we drop into an autohide sidebar area to preserve
+		// the dock area size for the initial size of the auto hide area
+		if (!ads::internal::isSideBarArea(Overlay->dropAreaUnderCursor()))
+		{
+			// Resize the floating widget to the size of the
+			// highlighted drop area rectangle
+			QRect Rect = Overlay->dropOverlayRect();
+			int FrameWidth = (_this->frameSize().width() - _this->rect().width()) / 2;
+			int TitleBarHeight = _this->frameSize().height() - _this->rect().height() - FrameWidth;
+			if (Rect.isValid())
+			{
+				QPoint TopLeft = Overlay->mapToGlobal(Rect.topLeft());
+				TopLeft.ry() += TitleBarHeight;
+				_this->setGeometry(QRect(TopLeft, QSize(Rect.width(), Rect.height() - TitleBarHeight)));
+			}
+		}
+		DropContainer->dropFloatingWidget(_this, QCursor::pos());
+		DropContainer->fetchIndependentCount();
+		// Case - Existing Drop FDC independence is just changed
+		auto DropFloatingContainer = DropContainer ? DropContainer->floatingWidget() : nullptr;
+		if (DropContainer && DropContainer->isFloating()											 // Target is FDC
+			&& (ContainerDropArea != InvalidDockWidgetArea || DockDropArea != InvalidDockWidgetArea) // Target exists
+			&& (_this != DropFloatingContainer) // No update if the widget is
+												// dropped into itself
+		)
+		{
+			// Check if the independence of this floating container changed by
+			// this drop
+			bool target_has_independent = DropContainer->hasIndependentWidget();
+			if (target_has_independent != target_had_independent)
+			{
+				CFloatingDockContainer* RestoredFloatingWidget = DropFloatingContainer->moveContainerAndDelete();
+				RestoredFloatingWidget->setUpdatesEnabled(true);
+				QTimer::singleShot(100,
+								   RestoredFloatingWidget,
+								   [RestoredFloatingWidget]()
+								   {
+									   RestoredFloatingWidget->activateWindow();
+								   });
+			}
+		}
+	}
+	containerOverlay->hideOverlay();
+	areaOverlay->hideOverlay();
+	DockManager->containerOverlay()->hideOverlay();
+	DockManager->dockAreaOverlay()->hideOverlay();
 }
 
 //============================================================================
 void FloatingDockContainerPrivate::updateDropOverlays(const QPoint& GlobalPos)
 {
-    if (!_this->isVisible() || !DockManager)
-    {
-        return;
-    }
+	if (!_this->isVisible() || !DockManager)
+	{
+		return;
+	}
 
-    // Prevent display of drop overlays and docking as long as a modal dialog
-    // is active
-    if (qApp->activeModalWidget())
-    {
-        return;
-    }
+	// Prevent display of drop overlays and docking as long as a modal dialog
+	// is active
+	if (qApp->activeModalWidget())
+	{
+		return;
+	}
 
-    auto Containers = DockManager->dockContainers();
+	if (_this->dockContainer() && _this->dockContainer()->hasMaximizedWidget())
+	{
+		return;
+	}
+
+	auto Containers = DockManager->dockContainers();
 	auto PrevTopContainer = TopContainer;
 	TopContainer = nullptr;
-    for (auto ContainerWidget : Containers)
-    {
-        if (!ContainerWidget->isVisible())
-        {
-            continue;
-        }
+	for (auto ContainerWidget : Containers)
+	{
+		if (!ContainerWidget->isVisible())
+		{
+			continue;
+		}
 
-        if (DockContainer == ContainerWidget)
-        {
-            continue;
-        }
+		if (DockContainer == ContainerWidget)
+		{
+			continue;
+		}
 
-        QPoint MappedPos = ContainerWidget->mapFromGlobal(GlobalPos);
-        if (ContainerWidget->rect().contains(MappedPos))
-        {
+		QPoint MappedPos = ContainerWidget->mapFromGlobal(GlobalPos);
+		if (ContainerWidget->rect().contains(MappedPos))
+		{
 			auto oldTopContainer = TopContainer;
-            if (!TopContainer || ContainerWidget->isInFrontOf(TopContainer))
-            {
-                TopContainer = ContainerWidget;
-            }
-        }
-    }
+			if (!TopContainer || ContainerWidget->isInFrontOf(TopContainer))
+			{
+				TopContainer = ContainerWidget;
+			}
+		}
+	}
 
-    DropContainer = TopContainer;
-    CDockOverlay* ContainerOverlay = _this->containerOverlay();
-    CDockOverlay* DockAreaOverlay = _this->dockAreaOverlay();
+	DropContainer = TopContainer;
+	CDockOverlay* ContainerOverlay = _this->containerOverlay();
+	CDockOverlay* DockAreaOverlay = _this->dockAreaOverlay();
 
-	if (!TopContainer || (DropContainer && DropContainer->window()->isMinimized()))
-    {
-        ContainerOverlay->hideOverlay();
-        DockAreaOverlay->hideOverlay();
-        DockManager->dockAreaOverlay()->hideOverlay();
-        DockManager->containerOverlay()->hideOverlay();
-        return;
-    }
-
+	if (!TopContainer || (DropContainer && DropContainer->window()->isMinimized())
+		|| (DropContainer && DropContainer->hasMaximizedWidget()))
+	{
+		ContainerOverlay->hideOverlay();
+		DockAreaOverlay->hideOverlay();
+		DockManager->dockAreaOverlay()->hideOverlay();
+		DockManager->containerOverlay()->hideOverlay();
+		return;
+	}
+	bool indepTopContainer = TopContainer && TopContainer->hasIndependentWidget();
+	bool indepThis = DockContainer && DockContainer->hasIndependentWidget();
 	if (TopContainer && TopContainer != PrevTopContainer)
 	{
 		TopContainer->raise();
 	}
-	if (DockContainer->hasIndependentWidget())
+	if (DockContainer && !(indepTopContainer && !indepThis))
 	{
 		DockContainer->raise();
 	}
 
-
 	auto ContainerDropArea = ContainerOverlay->dropAreaUnderCursor();
 	auto DockDropArea = DockAreaOverlay->dropAreaUnderCursor();
-    int VisibleDockAreas = TopContainer->visibleDockAreaCount();
+	int VisibleDockAreas = TopContainer->visibleDockAreaCount();
 	// Center dock widget area if the container has no dock area
 	DockWidgetAreas AllowedContainerAreas = (VisibleDockAreas > 1) ? OuterDockAreas : CenterDockWidgetArea;
-    auto DockArea = TopContainer->dockAreaAt(GlobalPos);
+	auto DockArea = TopContainer->dockAreaAt(GlobalPos);
 	// no dock area for the container overlay if one area exists
-    if (VisibleDockAreas == 1 && DockArea)
-    {
+	if (VisibleDockAreas == 1 && DockArea)
+	{
 		AllowedContainerAreas = InvalidDockWidgetArea;
-    }
-    if (DockContainer->features().testFlag(CDockWidget::DockWidgetPinnable))
-    {
-        AllowedContainerAreas |= AutoHideDockAreas;
-    }
+	}
+	if (DockContainer->features().testFlag(CDockWidget::DockWidgetPinnable))
+	{
+		AllowedContainerAreas |= AutoHideDockAreas;
+	}
 	bool isAreasPinnable = true;
 	// add auto hide areas if possible
 	for (int i = 0; i < this->DockContainer->dockAreaCount(); i++)
@@ -692,229 +678,123 @@ void FloatingDockContainerPrivate::updateDropOverlays(const QPoint& GlobalPos)
 		AllowedContainerAreas |= AutoHideDockAreas;
 	}
 
-    ContainerOverlay->setAllowedAreas(AllowedContainerAreas);
+	ContainerOverlay->setAllowedAreas(AllowedContainerAreas);
 	ContainerOverlay->enableDropPreview(ContainerDropArea != InvalidDockWidgetArea);
 	DockWidgetArea ContainerArea = InvalidDockWidgetArea;
 	DockWidgetArea Area = InvalidDockWidgetArea;
-    if (DockArea && DockArea->isVisible() && VisibleDockAreas > 0)
-    {
-        DockAreaOverlay->enableDropPreview(true);
-        DockAreaOverlay->setAllowedAreas(DockArea->allowedAreas());
-		
+	if (DockArea && DockArea->isVisible() && VisibleDockAreas > 0)
+	{
+		DockAreaOverlay->enableDropPreview(true);
+		DockAreaOverlay->setAllowedAreas(DockArea->allowedAreas());
+
 		Area = DockAreaOverlay->showOverlay(DockArea);
 		DockWidgetAreas ContainerDropAreas = ContainerDropArea;
-        // A CenterDockWidgetArea for the dockAreaOverlay() indicates that
-        // the mouse is in the title bar. If the ContainerArea is valid
-        // then we ignore the dock area of the dockAreaOverlay() and disable
-        // the drop preview
+		// A CenterDockWidgetArea for the dockAreaOverlay() indicates that
+		// the mouse is in the title bar. If the ContainerArea is valid
+		// then we ignore the dock area of the dockAreaOverlay() and disable
+		// the drop preview
 		if ((Area == CenterDockWidgetArea) && (ContainerDropAreas.testAnyFlags(OuterDockAreas))
 			&& !(ContainerDropAreas.testAnyFlags(AutoHideDockAreas)))
-        {
-            DockAreaOverlay->enableDropPreview(false);
-            ContainerOverlay->enableDropPreview(true);
-        }
-        else
-        {
-            ContainerOverlay->enableDropPreview(InvalidDockWidgetArea == Area);
-        }
+		{
+			DockAreaOverlay->enableDropPreview(false);
+			ContainerOverlay->enableDropPreview(true);
+		}
+		else
+		{
+			ContainerOverlay->enableDropPreview(InvalidDockWidgetArea == Area);
+		}
 		ContainerArea = ContainerOverlay->showOverlay(TopContainer);
-    }
-    else
-    {
-        DockAreaOverlay->hideOverlay();
-		ContainerArea = ContainerOverlay->showOverlay(TopContainer);		
-    }
+	}
+	else
+	{
+		DockAreaOverlay->hideOverlay();
+		ContainerArea = ContainerOverlay->showOverlay(TopContainer);
+	}
 	if (InvalidDockWidgetArea == ContainerArea && InvalidDockWidgetArea == Area)
 	{
 		DropContainer = nullptr;
-}
+	}
 }
 
 //============================================================================
 void FloatingDockContainerPrivate::handleEscapeKey()
 {
-    ADS_PRINT("FloatingDockContainerPrivate::handleEscapeKey()");
+	ADS_PRINT("FloatingDockContainerPrivate::handleEscapeKey()");
 	bool wasDragging = DraggingState == DraggingFloatingWidget;
-    setState(DraggingInactive);
-    CDockOverlay* ContainerOverlay = _this->containerOverlay();
-    CDockOverlay* DockAreaOverlay = _this->dockAreaOverlay();
-    ContainerOverlay->hideOverlay();
-    DockAreaOverlay->hideOverlay();
-    DockManager->containerOverlay()->hideOverlay();
-    DockManager->dockAreaOverlay()->hideOverlay();
+	setState(DraggingInactive);
+	CDockOverlay* ContainerOverlay = _this->containerOverlay();
+	CDockOverlay* DockAreaOverlay = _this->dockAreaOverlay();
+	ContainerOverlay->hideOverlay();
+	DockAreaOverlay->hideOverlay();
+	DockManager->containerOverlay()->hideOverlay();
+	DockManager->dockAreaOverlay()->hideOverlay();
 	if (wasDragging)
 	{
 		_this->move(DragStartPos);
-}
+	}
 }
 
 //============================================================================
-CFloatingDockContainer::CFloatingDockContainer(CDockManager* DockManager,
-                                               bool independent /*= false*/)
-    : tFloatingWidgetBase(DockManager), d(new FloatingDockContainerPrivate(this))
+CFloatingDockContainer::CFloatingDockContainer(CDockManager* DockManager, bool independent /*= false*/)
+	: tFloatingWidgetBase(independent ? nullptr : DockManager)
+	, d(new FloatingDockContainerPrivate(this))
 {
-    setMouseTracking(true);
-    this->installEventFilter(this);
-    d->LeftMBPressed = false;
-    d->CursorDirection = FloatingDockContainerPrivate::eDirection::NONE;
-    if (CDockManager::testConfigFlag(
-            CDockManager::eConfigFlag::FloatingShadowEnabled))
-    {
-        d->ResizeRegionPadding = 10;
-    }
-    else
-    {
-        d->ResizeRegionPadding = 0;
-    }
-    hide();
-    d->DockManager = DockManager;
-    d->DockContainer = new CDockContainerWidget(DockManager, this);
-    bool result = connect(d->DockContainer, SIGNAL(dockAreasAdded()), this,
-                          SLOT(onDockAreasAddedOrRemoved()));
-    assert(result);
-    result = connect(d->DockContainer, SIGNAL(dockAreasRemoved()), this,
-                     SLOT(onDockAreasAddedOrRemoved()));
-    assert(result);
-
-    bool native_window = true;
-    // FloatingContainerForce*TitleBar is overwritten by the "ADS_UseNativeTitle"
-    // environment variable if set.
-    auto env = qgetenv("ADS_UseNativeTitle").toUpper();
-    if (env == "1")
-    {
-        native_window = true;
-    }
-    else if (env == "0")
-    {
-        native_window = false;
-    }
-    else if (d->DockManager->testConfigFlag(
-                 CDockManager::FloatingContainerForceNativeTitleBar))
-    {
-        native_window = true;
-    }
-    else if (d->DockManager->testConfigFlag(
-                 CDockManager::FloatingContainerForceQWidgetTitleBar)
-             || d->DockManager->testConfigFlag(
-                 CDockManager::FloatingContainerForceQWidgetCustomStyledTitleBar))
-    {
-        native_window = false;
-    }
-    else
-    {
-#ifdef Q_OS_LINUX
-        // KDE doesn't seem to fire MoveEvents while moving windows, so for now no
-        // native title bar for everything using KWin.
-        QString window_manager =
-            internal::windowManager().toUpper().split(" ")[0];
-        native_window = window_manager != "KWIN";
-#endif
-    }
-
-    // Independent widget to be put on native window
-    if (independent || native_window)
-    {
-        // TODO check the line below
-        setTitleBarWidget(new QWidget());
-        setWindowFlags(Qt::Window);
-        tFloatingWidgetBase::setWidget(d->DockContainer);
-        tFloatingWidgetBase::setFeatures(
-            tFloatingWidgetBase::DockWidgetClosable
-            | tFloatingWidgetBase::DockWidgetMovable
-            | tFloatingWidgetBase::DockWidgetFloatable);
-        // Independent widget will have their own overlay
-        if (independent)
-        {
-            setParent(nullptr);
-            d->IndependentContainerOverlay =
-                new CDockOverlay(this, CDockOverlay::ModeContainerOverlay);
-            d->IndependentDockAreaOverlay =
-                new CDockOverlay(this, CDockOverlay::ModeDockAreaOverlay);
-        }
-    }
-    // No independent widgets, put it on non-native window
-    else if (!independent && !native_window)
-    {
-        d->DockContainer->setZOrderWindowIndex(0);  // reset the old window idx
-        tFloatingWidgetBase::setWidget(d->DockContainer);
-        // tFloatingWidgetBase::setFloating(true);
-        tFloatingWidgetBase::setFeatures(
-            tFloatingWidgetBase::DockWidgetClosable
-            | tFloatingWidgetBase::DockWidgetMovable
-            | tFloatingWidgetBase::DockWidgetFloatable);
-		setWindowFlags(Qt::Window | Qt::WindowMinMaxButtonsHint
-                       | Qt::FramelessWindowHint);
-        if (CDockManager::testConfigFlag(
-                CDockManager::eConfigFlag::FloatingShadowEnabled))
-        {
-            d->TransparentMargins = QMargins(5, 5, 5, 5);
-            auto shadow_ = new QGraphicsDropShadowEffect(this);
-            setAttribute(Qt::WA_TranslucentBackground);
-            shadow_->setObjectName("floatingDockContainerShadow");
-            shadow_->setBlurRadius(d->ResizeRegionPadding);
-            shadow_->setOffset(0);
-            shadow_->setColor({0, 0, 0, 255});  // black shadow
-            shadow_->setEnabled(true);
-            setGraphicsEffect(shadow_);
-            setAutoFillBackground(true);
-        }
-        else
-        {
-            d->StatusBar = new QStatusBar(d->DockContainer);
-            d->StatusBar->setObjectName("floatingWidgetStatusBar");
-            d->StatusBar->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
-            d->StatusBar->setContentsMargins(0, 0, 0, 0);
-            d->StatusBar->setFixedHeight(15);
-            d->DockContainer->layout()->addWidget(d->StatusBar);
-        }
-        d->TitleBar = new CFloatingWidgetTitleBar(this);
-        setTitleBarWidget(d->TitleBar);
-        d->TitleBar->enableCloseButton(isClosable());
-        connect(d->TitleBar, SIGNAL(closeRequested()), SLOT(close()));
-        connect(d->TitleBar, &CFloatingWidgetTitleBar::maximizeRequested, this,
-                &CFloatingDockContainer::onMaximizeRequest);
-    }
-    d->DockManager->registerFloatingWidget(this);
-    updateWindowTitle();
+	d->DockManager = DockManager;
+	setWindowFlags(Qt::Window | Qt::WindowMinMaxButtonsHint | Qt::WindowCloseButtonHint | Qt::WindowTitleHint
+				   | Qt::WindowSystemMenuHint);
+	Q_EMIT d->DockManager->creatingFloatingDockContainer(this);
+	d->DockContainer = new CDockContainerWidget(DockManager, this);
+	bool result = connect(d->DockContainer, SIGNAL(dockAreasAdded()), this, SLOT(onDockAreasAddedOrRemoved()));
+	assert(result);
+	result = connect(d->DockContainer, SIGNAL(dockAreasRemoved()), this, SLOT(onDockAreasAddedOrRemoved()));
+	assert(result);
+	tFloatingWidgetBase::setCentralWidget(d->DockContainer);
+	setMouseTracking(true);
+	hide();	
+	// Independent widget will have their own overlay
+	if (independent)
+	{
+		d->IndependentContainerOverlay = new CDockOverlay(this, CDockOverlay::ModeContainerOverlay);
+		d->IndependentDockAreaOverlay = new CDockOverlay(this, CDockOverlay::ModeDockAreaOverlay);
+	}
+	d->DockManager->registerFloatingWidget(this);
+	updateWindowTitle();
 }
 
 //============================================================================
 CFloatingDockContainer::CFloatingDockContainer(CDockAreaWidget* DockArea)
-    : CFloatingDockContainer(DockArea->dockManager(),
-                             DockArea->hasIndependentWidget())
+	: CFloatingDockContainer(DockArea->dockManager(), DockArea->hasIndependentWidget())
 {
-    d->DockContainer->addDockArea(DockArea);
-    auto TopLevelDockWidget = topLevelDockWidget();
-    if (TopLevelDockWidget)
-    {
-        TopLevelDockWidget->emitTopLevelChanged(true);
-    }
-    d->DockManager->notifyWidgetOrAreaRelocation(DockArea);
+	d->DockContainer->addDockArea(DockArea);
+	auto TopLevelDockWidget = topLevelDockWidget();
+	if (TopLevelDockWidget)
+	{
+		TopLevelDockWidget->emitTopLevelChanged(true);
+	}
+	d->DockManager->notifyWidgetOrAreaRelocation(DockArea);
 }
 
 //============================================================================
 CFloatingDockContainer::CFloatingDockContainer(CDockWidget* DockWidget)
-    : CFloatingDockContainer(
-        DockWidget->dockManager(),
-        DockWidget->features().testFlag(CDockWidget::DockWidgetIndependent))
+	: CFloatingDockContainer(DockWidget->dockManager(), DockWidget->features().testFlag(CDockWidget::DockWidgetIndependent))
 {
-    d->DockContainer->addDockWidget(CenterDockWidgetArea, DockWidget);
-    auto TopLevelDockWidget = topLevelDockWidget();
-    if (TopLevelDockWidget)
-    {
-        TopLevelDockWidget->emitTopLevelChanged(true);
-    }
-    d->DockManager->notifyWidgetOrAreaRelocation(DockWidget);
+	d->DockContainer->addDockWidget(CenterDockWidgetArea, DockWidget);
+	auto TopLevelDockWidget = topLevelDockWidget();
+	if (TopLevelDockWidget)
+	{
+		TopLevelDockWidget->emitTopLevelChanged(true);
+	}
+	d->DockManager->notifyWidgetOrAreaRelocation(DockWidget);
 }
 
 //============================================================================
 CFloatingDockContainer::~CFloatingDockContainer()
 {
-    ADS_PRINT("~CFloatingDockContainer");
-    if (d->DockManager)
-    {
-        d->DockManager->removeFloatingWidget(this);
-    }
+	ADS_PRINT("~CFloatingDockContainer");
+	if (d->DockManager)
+	{
+		d->DockManager->removeFloatingWidget(this);
+	}
 	if (d->IndependentContainerOverlay)
 	{
 		delete d->IndependentContainerOverlay;
@@ -923,703 +803,694 @@ CFloatingDockContainer::~CFloatingDockContainer()
 	{
 		delete d->IndependentDockAreaOverlay;
 	}
-    delete d;
+	delete d;
 }
 
 //============================================================================
 void CFloatingDockContainer::deleteContent()
 {
-    std::vector<QPointer<ads::CDockAreaWidget>> areas;
-    for (int i = 0; i != dockContainer()->dockAreaCount(); ++i)
-    {
-        areas.push_back(dockContainer()->dockArea(i));
-    }
-    for (auto area : areas)
-    {
-        if (!area)
-        {
-            continue;
-        }
+	std::vector<QPointer<ads::CDockAreaWidget>> areas;
+	for (int i = 0; i != dockContainer()->dockAreaCount(); ++i)
+	{
+		areas.push_back(dockContainer()->dockArea(i));
+	}
+	for (auto area : areas)
+	{
+		if (!area)
+		{
+			continue;
+		}
 
-        // QPointer delete safety - just in case some dock widget in destruction
-        // deletes another related/twin or child dock widget.
-        std::vector<QPointer<QWidget>> deleteWidgets;
-        for (auto widget : area->dockWidgets())
-        {
-            deleteWidgets.push_back(widget);
-        }
-        for (auto ptrWdg : deleteWidgets)
-        {
-            delete ptrWdg;
-        }
-    }
+		// QPointer delete safety - just in case some dock widget in destruction
+		// deletes another related/twin or child dock widget.
+		std::vector<QPointer<QWidget>> deleteWidgets;
+		for (auto widget : area->dockWidgets())
+		{
+			deleteWidgets.push_back(widget);
+		}
+		for (auto ptrWdg : deleteWidgets)
+		{
+			delete ptrWdg;
+		}
+	}
 }
 
 //============================================================================
 CDockContainerWidget* CFloatingDockContainer::dockContainer() const
 {
-    return d->DockContainer;
+	return d->DockContainer;
 }
 
 ads::CDockManager* CFloatingDockContainer::dockManager() const
 {
-    return d->DockManager;
+	return d->DockManager;
 }
 
 CFloatingDockContainer* CFloatingDockContainer::moveContainerAndDelete()
 {
-	containerOverlay()->hideOverlay();
-	dockAreaOverlay()->hideOverlay();
-    std::unordered_map<CDockWidget*, bool> open_map;
-    QRect geometry_ = geometry();
-    for (int j = 0; d->DockContainer && j < d->DockContainer->dockAreaCount();
-         j++)
-    {
-        auto DA = d->DockContainer->dockArea(j);
-        if (DA)
-        {
-            for (int i = 0; DA && i < DA->dockWidgetsCount(); i++)
-            {
-                auto DW = DA->dockWidget(i);
-                if (DW)
-                {
-                    open_map[DW] = DW->toggleViewAction()->isChecked();
-                }
-            }
-        }
-    }
+	if (containerOverlay())
+	{
+		containerOverlay()->hideOverlay();
+	}
+	else
+	{
+		d->DockManager->containerOverlay()->hideOverlay();
+	}
+	if (dockAreaOverlay())
+	{
+		dockAreaOverlay()->hideOverlay();
+	}
+	else
+	{
+		d->DockManager->dockAreaOverlay()->hideOverlay();
+	}
+	std::unordered_map<CDockWidget*, bool> open_map;
+	QRect geometry_ = geometry();
+	for (int j = 0; d->DockContainer && j < d->DockContainer->dockAreaCount(); j++)
+	{
+		auto DA = d->DockContainer->dockArea(j);
+		if (DA)
+		{
+			for (int i = 0; DA && i < DA->dockWidgetsCount(); i++)
+			{
+				auto DW = DA->dockWidget(i);
+				if (DW)
+				{
+					open_map[DW] = DW->toggleViewAction()->isChecked();
+				}
+			}
+		}
+	}
 
-    CFloatingDockContainer* RestoredFloatingWidget = new CFloatingDockContainer(
-        d->DockManager, d->DockContainer->hasIndependentWidget());
-    QByteArray containerData;
-    QXmlStreamWriter writer(&containerData);
-    d->DockContainer->saveState(writer);
-    blockSignals(true);
-    CDockingStateReader reader(containerData);
-    reader.setFileVersion(1);
-    reader.readNextStartElement();
-    Q_ASSERT(RestoredFloatingWidget->restoreState(reader, false)
-             && "Restore failed!");
-    RestoredFloatingWidget->d->DockContainer->fetchIndependentCount();
-    RestoredFloatingWidget->d->DockContainer->rootSplitter()->setVisible(true);
-    if (RestoredFloatingWidget->dockContainer()->dockAreaCount() == 1
-        && RestoredFloatingWidget->dockContainer()->dockArea(0)->dockWidgetsCount()
-               == 1)
-    {
-        RestoredFloatingWidget->dockContainer()->dockArea(0)->titleBar()->hide();
-    }
-    for (int j = 0; j < RestoredFloatingWidget->dockContainer()->dockAreaCount();
-         j++)
-    {
-        auto DA = RestoredFloatingWidget->dockContainer()->dockArea(j);
-        DA->setVisible(true);
-        for (int i = 0; i < DA->dockWidgetsCount(); i++)
-        {
-            DA->parentSplitter()->setVisible(true);
-            auto DW = DA->dockWidget(i);
-            if (DW && open_map[DW])
-            {
-                DW->toggleView(true);
-            }
-        }
-    }
-    RestoredFloatingWidget->setGeometry(geometry_);
-    RestoredFloatingWidget->show();
-    delete this;
-    return RestoredFloatingWidget;
+	CFloatingDockContainer* RestoredFloatingWidget =
+		new CFloatingDockContainer(d->DockManager, d->DockContainer->hasIndependentWidget());
+	QByteArray containerData;
+	QXmlStreamWriter writer(&containerData);
+	d->DockContainer->saveState(writer);
+	blockSignals(true);
+	CDockingStateReader reader(containerData);
+	reader.setFileVersion(1);
+	reader.readNextStartElement();
+	Q_ASSERT(RestoredFloatingWidget->restoreState(reader, false) && "Restore failed!");
+	RestoredFloatingWidget->d->DockContainer->fetchIndependentCount();
+	RestoredFloatingWidget->d->DockContainer->rootSplitter()->setVisible(true);
+	if (RestoredFloatingWidget->dockContainer()->dockAreaCount() == 1
+		&& RestoredFloatingWidget->dockContainer()->dockArea(0)->dockWidgetsCount() == 1)
+	{
+		RestoredFloatingWidget->dockContainer()->dockArea(0)->titleBar()->hide();
+	}
+	for (int j = 0; j < RestoredFloatingWidget->dockContainer()->dockAreaCount(); j++)
+	{
+		auto DA = RestoredFloatingWidget->dockContainer()->dockArea(j);
+		DA->setVisible(true);
+		for (int i = 0; i < DA->dockWidgetsCount(); i++)
+		{
+			DA->parentSplitter()->setVisible(true);
+			auto DW = DA->dockWidget(i);
+			if (DW && open_map[DW])
+			{
+				DW->toggleView(true);
+			}
+		}
+	}
+	RestoredFloatingWidget->setGeometry(geometry_);
+	RestoredFloatingWidget->show();
+	delete this;
+	return RestoredFloatingWidget;
 }
 
 //============================================================================
 void CFloatingDockContainer::changeEvent(QEvent* event)
 {
-    Super::changeEvent(event);
-    if ((event->type() == QEvent::WindowStateChange))
-    {
-        ADS_PRINT("FloatingWidget::changeEvent QEvent::ActivationChange");
-       	if (windowState() == Qt::WindowState::WindowMinimized && d->DraggingState == DraggingFloatingWidget)
-        {
-            d->titleMouseReleaseEvent();
+	Super::changeEvent(event);
+	if ((event->type() == QEvent::WindowStateChange))
+	{
+		ADS_PRINT("FloatingWidget::changeEvent QEvent::ActivationChange");
+		if (windowState() == Qt::WindowState::WindowMinimized && d->DraggingState == DraggingFloatingWidget)
+		{
+			d->titleMouseReleaseEvent();
 			d->setState(DraggingInactive);
-        }
-    }
+		}
+	}
 	else if (event->type() == QEvent::ZOrderChange)
-    {
+	{
 		event->ignore();
 	}
-    else if ((event->type() == QEvent::ActivationChange) && isActiveWindow())
-    {
-        // If the DockManager window is restored from minimized on Windows
-        // then the FloatingWidgets are not properly restored to maximized but
-        // to normal state.
-        // We simply check here, if the FloatingWidget was maximized before
-        // and if the DockManager is just leaving the minimized state. In this
-        // case, we restore the maximized state of this floating widget
-        if (d->DockManager->isLeavingMinimizedState())
-        {
-            QWindowStateChangeEvent* ev =
-                static_cast<QWindowStateChangeEvent*>(event);
-            if (ev->oldState().testFlag(Qt::WindowMaximized))
-            {
-                this->showMaximized();
-            }
-        }
-    }
+	else if ((event->type() == QEvent::ActivationChange) && isActiveWindow())
+	{
+		// If the DockManager window is restored from minimized on Windows
+		// then the FloatingWidgets are not properly restored to maximized but
+		// to normal state.
+		// We simply check here, if the FloatingWidget was maximized before
+		// and if the DockManager is just leaving the minimized state. In this
+		// case, we restore the maximized state of this floating widget
+		if (d->DockManager->isLeavingMinimizedState())
+		{
+			QWindowStateChangeEvent* ev = static_cast<QWindowStateChangeEvent*>(event);
+			if (ev->oldState().testFlag(Qt::WindowMaximized))
+			{
+				this->showMaximized();
+			}
+		}
+	}
 }
 
 #ifdef Q_OS_WIN
-#    if (QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
-bool CFloatingDockContainer::nativeEvent(const QByteArray& eventType,
-                                         void* message, long* result)
-#    else
-bool CFloatingDockContainer::nativeEvent(const QByteArray& eventType,
-                                         void* message, qintptr* result)
-#    endif
+#if (QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
+bool CFloatingDockContainer::nativeEvent(const QByteArray& eventType, void* message, long* result)
+#else
+bool CFloatingDockContainer::nativeEvent(const QByteArray& eventType, void* message, qintptr* result)
+#endif
 {
-    QWidget::nativeEvent(eventType, message, result);
-    MSG* msg = static_cast<MSG*>(message);
-    switch (msg->message)
-    {
-    case WM_MOVING:
-    {
-        if (d->isState(DraggingMousePressed))
-		{
-			d->setState(DraggingFloatingWidget);
-		}
-        if (d->isState(DraggingFloatingWidget))
-        {
-            d->updateDropOverlays(QCursor::pos());
-        }
-    }
-    break;
-    case WM_NCLBUTTONDOWN:
+	QWidget::nativeEvent(eventType, message, result);
+	MSG* msg = static_cast<MSG*>(message);
+	switch (msg->message)
 	{
-		if (msg->wParam == HTCAPTION)
+	case WM_MOVING:
 		{
-            d->NativeCaptionPress = true;
+			if (d->isState(DraggingMousePressed))
+			{
+				d->setState(DraggingFloatingWidget);
+			}
+			if (d->isState(DraggingFloatingWidget))
+			{
+				d->updateDropOverlays(QCursor::pos());
+			}
 		}
-        if (msg->wParam == HTCAPTION && d->isState(DraggingInactive))
-        {
-            ADS_PRINT("CFloatingDockContainer::nativeEvent WM_NCLBUTTONDOWN");
-            d->DragStartPos = pos();
-            d->setState(DraggingMousePressed);
-        }
-	}
-        break;
+		break;
+	case WM_NCLBUTTONDOWN:
+		{
+			if (msg->wParam == HTCAPTION)
+			{
+				d->NativeCaptionPress = true;
+			}
+			if (msg->wParam == HTCAPTION && d->isState(DraggingInactive))
+			{
+				ADS_PRINT("CFloatingDockContainer::nativeEvent WM_NCLBUTTONDOWN");
+				d->DragStartPos = pos();
+				d->setState(DraggingMousePressed);
+			}
+		}
+		break;
 	case WM_NCLBUTTONUP:
-	{
-		if (msg->wParam == HTCAPTION)
 		{
-            d->NativeCaptionPress = false;
+			if (msg->wParam == HTCAPTION)
+			{
+				d->NativeCaptionPress = false;
+			}
 		}
+		break;
+	case WM_NCLBUTTONDBLCLK:
+		{
+			d->NativeCaptionPress = false;
+			d->setState(DraggingInactive);
+			onMaximizeRequest();
+			return true;
+		}
+		break;
+	case WM_EXITSIZEMOVE:
+		{
+			if (d->isState(DraggingFloatingWidget))
+			{
+				ADS_PRINT("CFloatingDockContainer::nativeEvent WM_EXITSIZEMOVE");
+				if (GetAsyncKeyState(VK_ESCAPE) & 0x8000)
+				{
+					d->handleEscapeKey();
+				}
+				else
+				{
+					d->titleMouseReleaseEvent();
+				}
+			}
+		}
+		break;
 	}
-	break;
-    case WM_NCLBUTTONDBLCLK:
-    {
-        d->NativeCaptionPress = false;
-        d->setState(DraggingInactive);
-        onMaximizeRequest();
-        return true;
-    }
-    break;
-    case WM_EXITSIZEMOVE:
-	{
-        if (d->isState(DraggingFloatingWidget))
-        {
-            ADS_PRINT("CFloatingDockContainer::nativeEvent WM_EXITSIZEMOVE");
-            if (GetAsyncKeyState(VK_ESCAPE) & 0x8000)
-            {
-                d->handleEscapeKey();
-            }
-            else
-            {
-                d->titleMouseReleaseEvent();
-            }
-        }
-	}
-        break;
-    }
-    return false;
+	return false;
 }
 #endif
 
 //============================================================================
 void CFloatingDockContainer::closeEvent(QCloseEvent* event)
 {
-    ADS_PRINT("CFloatingDockContainer closeEvent");
-    d->setState(DraggingInactive);
-    event->ignore();
-    if (!isClosable())
-    {
-        return;
-    }
+	ADS_PRINT("CFloatingDockContainer closeEvent");
+	d->setState(DraggingInactive);
+	event->ignore();
+	if (!isClosable())
+	{
+		return;
+	}
 
-    bool HasOpenDockWidgets = false;
-    for (auto DockWidget : d->DockContainer->openedDockWidgets())
-    {
-        if (DockWidget->features().testFlag(CDockWidget::DockWidgetDeleteOnClose)
-            || DockWidget->features().testFlag(CDockWidget::CustomCloseHandling))
-        {
-            bool Closed = DockWidget->closeDockWidgetInternal();
-            if (!Closed)
-            {
-                HasOpenDockWidgets = true;
-            }
-        }
-        else
-        {
-            DockWidget->toggleView(false);
-        }
-    }
+	bool HasOpenDockWidgets = false;
+	for (auto DockWidget : d->DockContainer->openedDockWidgets())
+	{
+		if (DockWidget->features().testFlag(CDockWidget::DockWidgetDeleteOnClose)
+			|| DockWidget->features().testFlag(CDockWidget::CustomCloseHandling))
+		{
+			bool Closed = DockWidget->closeDockWidgetInternal();
+			if (!Closed)
+			{
+				HasOpenDockWidgets = true;
+			}
+		}
+		else
+		{
+			DockWidget->toggleView(false);
+		}
+	}
 
-    if (HasOpenDockWidgets)
-    {
-        return;
-    }
+	if (HasOpenDockWidgets)
+	{
+		return;
+	}
 
-    // In Qt version after 5.9.2 there seems to be a bug that causes the
-    // QWidget::event() function to not receive any NonClientArea mouse
-    // events anymore after a close/show cycle. The bug is reported here:
-    // https://bugreports.qt.io/browse/QTBUG-73295
-    // The following code is a workaround for Qt versions > 5.9.2 that seems
-    // to work
-    // Starting from Qt version 5.12.2 this seems to work again. But
-    // now the QEvent::NonClientAreaMouseButtonPress function returns always
-    // Qt::RightButton even if the left button was pressed
-    this->hide();
+	// In Qt version after 5.9.2 there seems to be a bug that causes the
+	// QWidget::event() function to not receive any NonClientArea mouse
+	// events anymore after a close/show cycle. The bug is reported here:
+	// https://bugreports.qt.io/browse/QTBUG-73295
+	// The following code is a workaround for Qt versions > 5.9.2 that seems
+	// to work
+	// Starting from Qt version 5.12.2 this seems to work again. But
+	// now the QEvent::NonClientAreaMouseButtonPress function returns always
+	// Qt::RightButton even if the left button was pressed
+	this->hide();
 }
 
 //============================================================================
 void CFloatingDockContainer::hideEvent(QHideEvent* event)
 {
-    Super::hideEvent(event);
-    if (event->spontaneous())
-    {
-        return;
-    }
+	Super::hideEvent(event);
+	if (event->spontaneous())
+	{
+		return;
+	}
 
-    // Prevent toogleView() events during restore state
-    if (d->DockManager->isRestoringState())
-    {
-        return;
-    }
+	// Prevent toogleView() events during restore state
+	if (d->DockManager->isRestoringState())
+	{
+		return;
+	}
 
-    if (d->AutoHideChildren)
-    {
-        d->Hiding = true;
-        for (auto DockArea : d->DockContainer->openedDockAreas())
-        {
-            for (auto DockWidget : DockArea->openedDockWidgets())
-            {
-                DockWidget->toggleView(false);
-            }
-        }
-        d->Hiding = false;
-    }
+	if (d->AutoHideChildren)
+	{
+		d->Hiding = true;
+		for (auto DockArea : d->DockContainer->openedDockAreas())
+		{
+			for (auto DockWidget : DockArea->openedDockWidgets())
+			{
+				DockWidget->toggleView(false);
+			}
+		}
+		d->Hiding = false;
+	}
 }
 
 //============================================================================
 void CFloatingDockContainer::showEvent(QShowEvent* event)
 {
-    Super::showEvent(event);
-    if (CDockManager::testConfigFlag(CDockManager::FocusHighlighting))
-    {
-        this->window()->activateWindow();
-    }
+	Super::showEvent(event);
+	if (CDockManager::testConfigFlag(CDockManager::FocusHighlighting))
+	{
+		this->window()->activateWindow();
+	}
 }
 
 //============================================================================
 void CFloatingDockContainer::startFloating(const QPoint& DragStartMousePos,
-                                           const QSize& Size,
-                                           eDragState DragState,
-                                           QWidget* MouseEventHandler)
+										   const QSize& Size,
+										   eDragState DragState,
+										   QWidget* MouseEventHandler)
 {
-    if (!isMaximized())
-    {
-        resize(Size);
-        d->DragStartMousePosition = DragStartMousePos;
-    }
-    d->setState(DragState);
-    if (DraggingFloatingWidget == DragState)
-    {
-        d->MouseEventHandler = MouseEventHandler;
-        if (d->MouseEventHandler)
-        {
-            d->MouseEventHandler->grabMouse();
-        }
-    }
+	if (!isMaximized())
+	{
+		resize(Size);
+		d->DragStartMousePosition = DragStartMousePos;
+	}
+	d->setState(DragState);
+	if (DraggingFloatingWidget == DragState)
+	{
+		d->MouseEventHandler = MouseEventHandler;
+		if (d->MouseEventHandler)
+		{
+			d->MouseEventHandler->grabMouse();
+		}
+	}
 
-    if (!isMaximized())
-    {
-        moveFloating();
-    }
-    show();
+	if (!isMaximized())
+	{
+		moveFloating();
+	}
+	show();
 }
 
 //============================================================================
 void CFloatingDockContainer::moveFloating()
 {
-    int BorderSize = (frameSize().width() - size().width()) / 2;
-    const QPoint moveToPos = QCursor::pos() - d->DragStartMousePosition
-                             - QPoint(BorderSize, 0);
+	int BorderSize = (frameSize().width() - size().width()) / 2;
+	const QPoint moveToPos = QCursor::pos() - d->DragStartMousePosition - QPoint(BorderSize, 0);
 
-    move(moveToPos);
-    switch (d->DraggingState)
-    {
-    case DraggingMousePressed:
-        d->setState(DraggingFloatingWidget);
-        d->updateDropOverlays(QCursor::pos());
-        break;
+	move(moveToPos);
+	switch (d->DraggingState)
+	{
+	case DraggingMousePressed:
+		d->setState(DraggingFloatingWidget);
+		d->updateDropOverlays(QCursor::pos());
+		break;
 
-    case DraggingFloatingWidget: d->updateDropOverlays(QCursor::pos()); break;
-    default: break;
-    }
+	case DraggingFloatingWidget:
+		d->updateDropOverlays(QCursor::pos());
+		break;
+	default:
+		break;
+	}
 }
 
 //============================================================================
 bool CFloatingDockContainer::isClosable() const
 {
-    return d->DockContainer->features().testFlag(CDockWidget::DockWidgetClosable);
+	return d->DockContainer->features().testFlag(CDockWidget::DockWidgetClosable);
 }
 
 //============================================================================
 void CFloatingDockContainer::onDockAreasAddedOrRemoved()
 {
-    ADS_PRINT("CFloatingDockContainer::onDockAreasAddedOrRemoved()");
-    auto TopLevelDockArea = d->DockContainer->topLevelDockArea();
-    auto TopLevelDockWidget = d->DockContainer->topLevelDockWidget();
+	ADS_PRINT("CFloatingDockContainer::onDockAreasAddedOrRemoved()");
+	auto TopLevelDockArea = d->DockContainer->topLevelDockArea();
+	auto TopLevelDockWidget = d->DockContainer->topLevelDockWidget();
 
-    if (TopLevelDockArea || d->DockContainer->dockAreaCount() == 1)
-    {
-        d->SingleDockArea = TopLevelDockArea;
-        if (d->SingleDockArea == nullptr
-            && d->DockContainer->dockAreaCount() == 1)
-        {
-            d->SingleDockArea = d->DockContainer->dockArea(0);
-        }
-        CDockWidget* CurrentWidget = d->SingleDockArea->currentDockWidget();
-        d->reflectCurrentWidget(CurrentWidget);
-        connect(d->SingleDockArea, SIGNAL(currentChanged(int)), this,
-                SLOT(onDockAreaCurrentChanged(int)));
-    }
-    else
-    {
-        if (d->SingleDockArea)
-        {
-            disconnect(d->SingleDockArea, SIGNAL(currentChanged(int)), this,
-                       SLOT(onDockAreaCurrentChanged(int)));
-            d->SingleDockArea = nullptr;
-        }
-        if (d->DockContainer->dockAreaCount() > 0)
-        {
-            d->setWindowTitle(d->floatingContainersTitle());
-            setWindowIcon(QApplication::windowIcon());
-        }
-    }
+	if (TopLevelDockArea || d->DockContainer->dockAreaCount() == 1)
+	{
+		d->SingleDockArea = TopLevelDockArea;
+		if (d->SingleDockArea == nullptr && d->DockContainer->dockAreaCount() == 1)
+		{
+			d->SingleDockArea = d->DockContainer->dockArea(0);
+		}
+		CDockWidget* CurrentWidget = d->SingleDockArea->currentDockWidget();
+		d->reflectCurrentWidget(CurrentWidget);
+		connect(d->SingleDockArea, SIGNAL(currentChanged(int)), this, SLOT(onDockAreaCurrentChanged(int)));
+	}
+	else
+	{
+		if (d->SingleDockArea)
+		{
+			disconnect(d->SingleDockArea, SIGNAL(currentChanged(int)), this, SLOT(onDockAreaCurrentChanged(int)));
+			d->SingleDockArea = nullptr;
+		}
+		if (d->DockContainer->dockAreaCount() > 0)
+		{
+			d->setWindowTitle(d->floatingContainersTitle());
+			setWindowIcon(QApplication::windowIcon());
+		}
+	}
 }
 
 //============================================================================
 void CFloatingDockContainer::updateWindowTitle()
 {
-    // If this floating container will be hidden, then updating the window
-    // tile is not required anymore
-    if (d->Hiding)
-    {
-        return;
-    }
+	// If this floating container will be hidden, then updating the window
+	// tile is not required anymore
+	if (d->Hiding)
+	{
+		return;
+	}
 
-    auto TopLevelDockArea = d->DockContainer->topLevelDockArea();
-    if (TopLevelDockArea)
-    {
-        CDockWidget* CurrentWidget = TopLevelDockArea->currentDockWidget();
-        if (CurrentWidget)
-        {
-            d->reflectCurrentWidget(CurrentWidget);
-        }
-    }
-    else
-    {
-        d->setWindowTitle(d->floatingContainersTitle());
-        setWindowIcon(QApplication::windowIcon());
-    }
+	auto TopLevelDockArea = d->DockContainer->topLevelDockArea();
+	if (TopLevelDockArea)
+	{
+		CDockWidget* CurrentWidget = TopLevelDockArea->currentDockWidget();
+		if (CurrentWidget)
+		{
+			d->reflectCurrentWidget(CurrentWidget);
+		}
+	}
+	else
+	{
+		d->setWindowTitle(d->floatingContainersTitle());
+		setWindowIcon(QApplication::windowIcon());
+	}
 }
 
 ads::CDockOverlay* CFloatingDockContainer::containerOverlay()
 {
-    if (d->DockContainer->hasIndependentWidget())
-    {
-        return d->IndependentContainerOverlay;
-    }
-    else
-    {
-        return d->DockManager->containerOverlay();
-    }
+	if (d->DockContainer->hasIndependentWidget())
+	{
+		return d->IndependentContainerOverlay;
+	}
+	else
+	{
+		return d->DockManager->containerOverlay();
+	}
 }
 
 ads::CDockOverlay* CFloatingDockContainer::dockAreaOverlay()
 {
-    if (d->DockContainer->hasIndependentWidget())
-    {
-        return d->IndependentDockAreaOverlay;
-    }
-    else
-    {
-        return d->DockManager->dockAreaOverlay();
-    }
+	if (d->DockContainer->hasIndependentWidget())
+	{
+		return d->IndependentDockAreaOverlay;
+	}
+	else
+	{
+		return d->DockManager->dockAreaOverlay();
+	}
 }
 
 //============================================================================
 void CFloatingDockContainer::onDockAreaCurrentChanged(int Index)
 {
-    Q_UNUSED(Index);
-    CDockWidget* CurrentWidget = d->SingleDockArea->currentDockWidget();
-    d->reflectCurrentWidget(CurrentWidget);
+	Q_UNUSED(Index);
+	CDockWidget* CurrentWidget = d->SingleDockArea->currentDockWidget();
+	d->reflectCurrentWidget(CurrentWidget);
 }
 
 //============================================================================
-bool CFloatingDockContainer::restoreState(CDockingStateReader& Stream,
-                                          bool Testing)
+bool CFloatingDockContainer::restoreState(CDockingStateReader& Stream, bool Testing)
 {
-    if (!d->DockContainer->restoreState(Stream, Testing))
-    {
-        return false;
-    }
-    onDockAreasAddedOrRemoved();
-    if (d->TitleBar)
-    {
-        d->TitleBar->setMaximizedIcon(windowState() == Qt::WindowMaximized);
-    }
-    return true;
+	if (!d->DockContainer->restoreState(Stream, Testing))
+	{
+		return false;
+	}
+	onDockAreasAddedOrRemoved();
+	return true;
 }
 
 //============================================================================
 bool CFloatingDockContainer::hasTopLevelDockWidget() const
 {
-    return d->DockContainer->hasTopLevelDockWidget();
+	return d->DockContainer->hasTopLevelDockWidget();
 }
 
 //============================================================================
 CDockWidget* CFloatingDockContainer::topLevelDockWidget() const
 {
-    return d->DockContainer->topLevelDockWidget();
+	return d->DockContainer->topLevelDockWidget();
 }
 
 //============================================================================
 QList<CDockWidget*> CFloatingDockContainer::dockWidgets() const
 {
-    return d->DockContainer->dockWidgets();
+	return d->DockContainer->dockWidgets();
 }
 
 //============================================================================
 void CFloatingDockContainer::hideAndDeleteLater()
 {
-    // Widget has been redocked, so it must be hidden right way (see
-    // https://github.com/githubuser0xFFFF/Qt-Advanced-Docking-System/issues/351)
-    // but AutoHideChildren must be set to false because "this" still contains
-    // dock widgets that shall not be toggled hidden.
-    d->AutoHideChildren = false;
-    hide();
-    // The floating widget will be deleted now. Ensure, that the destructor
-    // of the floating widget does not delete any dock areas that have been
-    // moved to a new container - simply remove all dock areas before deleting
-    // the floating widget
-    d->DockContainer->removeAllDockAreas();
-    deleteLater();
-    if (d->DockManager)
-    {
-        d->DockManager->removeFloatingWidget(this);
-        d->DockManager->removeDockContainer(this->dockContainer());
-    }
+	// Widget has been redocked, so it must be hidden right way (see
+	// https://github.com/githubuser0xFFFF/Qt-Advanced-Docking-System/issues/351)
+	// but AutoHideChildren must be set to false because "this" still contains
+	// dock widgets that shall not be toggled hidden.
+	d->AutoHideChildren = false;
+	hide();
+	// The floating widget will be deleted now. Ensure, that the destructor
+	// of the floating widget does not delete any dock areas that have been
+	// moved to a new container - simply remove all dock areas before deleting
+	// the floating widget
+	d->DockContainer->removeAllDockAreas();
+	deleteLater();
+	if (d->DockManager)
+	{
+		d->DockManager->removeFloatingWidget(this);
+		d->DockManager->removeDockContainer(this->dockContainer());
+	}
 }
 
 //============================================================================
 void CFloatingDockContainer::finishDropOperation()
 {
-    // Widget has been redocked, so it must be hidden right way (see
-    // https://github.com/githubuser0xFFFF/Qt-Advanced-Docking-System/issues/351)
-    // but AutoHideChildren must be set to false because "this" still contains
-    // dock widgets that shall not be toggled hidden.
-    d->AutoHideChildren = false;
-    hide();
-    // The floating widget will be deleted now. Ensure, that the destructor
-    // of the floating widget does not delete any dock areas that have been
-    // moved to a new container - simply remove all dock areas before deleting
-    // the floating widget
-    d->DockContainer->removeAllDockAreas();
-    deleteLater();
-    if (d->DockManager)
-    {
-        d->DockManager->removeFloatingWidget(this);
-        d->DockManager->removeDockContainer(this->dockContainer());
-    }
+	// Widget has been redocked, so it must be hidden right way (see
+	// https://github.com/githubuser0xFFFF/Qt-Advanced-Docking-System/issues/351)
+	// but AutoHideChildren must be set to false because "this" still contains
+	// dock widgets that shall not be toggled hidden.
+	d->AutoHideChildren = false;
+	hide();
+	// The floating widget will be deleted now. Ensure, that the destructor
+	// of the floating widget does not delete any dock areas that have been
+	// moved to a new container - simply remove all dock areas before deleting
+	// the floating widget
+	d->DockContainer->removeAllDockAreas();
+	deleteLater();
+	if (d->DockManager)
+	{
+		d->DockManager->removeFloatingWidget(this);
+		d->DockManager->removeDockContainer(this->dockContainer());
+	}
 }
 
 //============================================================================
 void CFloatingDockContainer::finishDragging()
 {
-    ADS_PRINT("CFloatingDockContainer::finishDragging");
-    setWindowOpacity(1);
-    activateWindow();
-
-    if (d->MouseEventHandler)
-    {
-        d->MouseEventHandler->releaseMouse();
-        d->MouseEventHandler = nullptr;
-    }
-    d->titleMouseReleaseEvent();
+	ADS_PRINT("CFloatingDockContainer::finishDragging");
+	setWindowOpacity(1);
+	activateWindow();
+	if (d->MouseEventHandler)
+	{
+		d->MouseEventHandler->releaseMouse();
+		d->MouseEventHandler = nullptr;
+	}
+	d->titleMouseReleaseEvent();
 }
 
 #ifdef Q_OS_MACOS
 //============================================================================
 bool CFloatingDockContainer::event(QEvent* e)
 {
-    switch (d->DraggingState)
-    {
-    case DraggingInactive:
-    {
-        // Normally we would check here, if the left mouse button is pressed.
-        // But from QT version 5.12.2 on the mouse events from
-        // QEvent::NonClientAreaMouseButtonPress return the wrong mouse button
-        // The event always returns Qt::RightButton even if the left button
-        // is clicked.
-        // It is really great to work around the whole NonClientMouseArea
-        // bugs
-#    if (QT_VERSION >= QT_VERSION_CHECK(5, 12, 2))
-        if (e->type() == QEvent::NonClientAreaMouseButtonPress /*&& QGuiApplication::mouseButtons().testFlag(Qt::LeftButton)*/)
-#    else
-        if (e->type() == QEvent::NonClientAreaMouseButtonPress
-            && QGuiApplication::mouseButtons().testFlag(Qt::LeftButton))
-#    endif
-        {
-            ADS_PRINT("FloatingWidget::event Event::NonClientAreaMouseButtonPress"
-                      << e->type());
-            d->DragStartPos = pos();
-            d->setState(DraggingMousePressed);
-        }
-    }
-    break;
+	switch (d->DraggingState)
+	{
+	case DraggingInactive:
+		{
+			// Normally we would check here, if the left mouse button is pressed.
+			// But from QT version 5.12.2 on the mouse events from
+			// QEvent::NonClientAreaMouseButtonPress return the wrong mouse button
+			// The event always returns Qt::RightButton even if the left button
+			// is clicked.
+			// It is really great to work around the whole NonClientMouseArea
+			// bugs
+#if (QT_VERSION >= QT_VERSION_CHECK(5, 12, 2))
+			if (e->type()
+				== QEvent::NonClientAreaMouseButtonPress /*&& QGuiApplication::mouseButtons().testFlag(Qt::LeftButton)*/)
+#else
+			if (e->type() == QEvent::NonClientAreaMouseButtonPress && QGuiApplication::mouseButtons().testFlag(Qt::LeftButton))
+#endif
+			{
+				ADS_PRINT("FloatingWidget::event Event::NonClientAreaMouseButtonPress" << e->type());
+				d->DragStartPos = pos();
+				d->setState(DraggingMousePressed);
+			}
+		}
+		break;
 
-    case DraggingMousePressed:
-        switch (e->type())
-        {
-        case QEvent::NonClientAreaMouseButtonDblClick:
-            ADS_PRINT(
-                "FloatingWidget::event QEvent::NonClientAreaMouseButtonDblClick");
-            d->setState(DraggingInactive);
-            break;
+	case DraggingMousePressed:
+		switch (e->type())
+		{
+		case QEvent::NonClientAreaMouseButtonDblClick:
+			ADS_PRINT("FloatingWidget::event QEvent::NonClientAreaMouseButtonDblClick");
+			d->setState(DraggingInactive);
+			break;
 
-        case QEvent::Resize:
-            // If the first event after the mouse press is a resize event, then
-            // the user resizes the window instead of dragging it around.
-            // But there is one exception. If the window is maximized,
-            // then dragging the window via title bar will cause the widget to
-            // leave the maximized state. This in turn will trigger a resize
-            // event. To know, if the resize event was triggered by user via
-            // moving a corner of the window frame or if it was caused by a
-            // windows state change, we check, if we are not in maximized state.
-            if (!isMaximized())
-            {
-                d->setState(DraggingInactive);
-            }
-            break;
+		case QEvent::Resize:
+			// If the first event after the mouse press is a resize event, then
+			// the user resizes the window instead of dragging it around.
+			// But there is one exception. If the window is maximized,
+			// then dragging the window via title bar will cause the widget to
+			// leave the maximized state. This in turn will trigger a resize
+			// event. To know, if the resize event was triggered by user via
+			// moving a corner of the window frame or if it was caused by a
+			// windows state change, we check, if we are not in maximized state.
+			if (!isMaximized())
+			{
+				d->setState(DraggingInactive);
+			}
+			break;
 
-        default: break;
-        }
-        break;
+		default:
+			break;
+		}
+		break;
 
-    case DraggingFloatingWidget:
-        if (e->type() == QEvent::NonClientAreaMouseButtonRelease)
-        {
-            ADS_PRINT(
-                "FloatingWidget::event QEvent::NonClientAreaMouseButtonRelease");
-            d->titleMouseReleaseEvent();
-        }
-        break;
+	case DraggingFloatingWidget:
+		if (e->type() == QEvent::NonClientAreaMouseButtonRelease)
+		{
+			ADS_PRINT("FloatingWidget::event QEvent::NonClientAreaMouseButtonRelease");
+			d->titleMouseReleaseEvent();
+		}
+		break;
 
-    default: break;
-    }
+	default:
+		break;
+	}
 
-#    if (ADS_DEBUG_LEVEL > 0)
-    qDebug() << QTime::currentTime() << "CFloatingDockContainer::event "
-             << e->type();
-#    endif
-    return QWidget::event(e);
+#if (ADS_DEBUG_LEVEL > 0)
+	qDebug() << QTime::currentTime() << "CFloatingDockContainer::event " << e->type();
+#endif
+	return QWidget::event(e);
 }
 
 //============================================================================
 void CFloatingDockContainer::moveEvent(QMoveEvent* event)
 {
-    QWidget::moveEvent(event);
-    switch (d->DraggingState)
-    {
-    case DraggingMousePressed:
-        d->setState(DraggingFloatingWidget);
-        d->updateDropOverlays(QCursor::pos());
-        break;
+	QWidget::moveEvent(event);
+	switch (d->DraggingState)
+	{
+	case DraggingMousePressed:
+		d->setState(DraggingFloatingWidget);
+		d->updateDropOverlays(QCursor::pos());
+		break;
 
-    case DraggingFloatingWidget: d->updateDropOverlays(QCursor::pos()); break;
-    default: break;
-    }
-    QApplication::setActiveWindow(this);
-    activateWindow();
+	case DraggingFloatingWidget:
+		d->updateDropOverlays(QCursor::pos());
+		break;
+	default:
+		break;
+	}
+	QApplication::setActiveWindow(this);
+	activateWindow();
 }
 #endif
 
 //============================================================================
 void CFloatingDockContainer::onMaximizeRequest()
 {
-    if (windowState() == Qt::WindowMaximized)
-    {
-        showNormal();
-    }
-    else
-    {
-        showMaximized();
-    }
+	if (windowState() == Qt::WindowMaximized)
+	{
+		showNormal();
+	}
+	else
+	{
+		showMaximized();
+	}
 }
 
 //============================================================================
 void CFloatingDockContainer::showNormal(bool fixGeometry)
 {
-    if (windowState() == Qt::WindowMaximized)
-    {
-        QRect oldNormal = normalGeometry();
-        Super::showNormal();
-        if (fixGeometry)
-        {
-            setGeometry(oldNormal);
-        }
-    }
-    if (d->TitleBar)
-    {
-        d->TitleBar->setMaximizedIcon(false);
-    }
+	if (windowState() == Qt::WindowMaximized)
+	{
+		QRect oldNormal = normalGeometry();
+		Super::showNormal();
+		if (fixGeometry)
+		{
+			setGeometry(oldNormal);
+		}
+	}
 }
 
 //============================================================================
 void CFloatingDockContainer::showMaximized()
 {
-    Super::showMaximized();
-    if (d->TitleBar)
-    {
-        d->TitleBar->setMaximizedIcon(true);
-    }
+	Super::showMaximized();
 }
 
 //============================================================================
 bool CFloatingDockContainer::isMaximized() const
 {
-    return windowState() == Qt::WindowMaximized;
+	return windowState() == Qt::WindowMaximized;
 }
 
 //============================================================================
 void CFloatingDockContainer::show()
 {
-    // Prevent this window from showing in the taskbar and pager (alt+tab)
+	// Prevent this window from showing in the taskbar and pager (alt+tab)
 #ifdef Q_OS_LINUX
-    internal::xcb_add_prop(true, winId(), "_NET_WM_STATE",
-                           "_NET_WM_STATE_SKIP_TASKBAR");
-    internal::xcb_add_prop(true, winId(), "_NET_WM_STATE",
-                           "_NET_WM_STATE_SKIP_PAGER");
+	internal::xcb_add_prop(true, winId(), "_NET_WM_STATE", "_NET_WM_STATE_SKIP_TASKBAR");
+	internal::xcb_add_prop(true, winId(), "_NET_WM_STATE", "_NET_WM_STATE_SKIP_PAGER");
 #endif
 	Super::show();
 }
@@ -1627,42 +1498,29 @@ void CFloatingDockContainer::show()
 //============================================================================
 void CFloatingDockContainer::resizeEvent(QResizeEvent* event)
 {
-    if (!d->NativeCaptionPress)
-	{
-    d->IsResizing = true;
-		d->setState(DraggingInactive);
-	}
-    Super::resizeEvent(event);
+	Super::resizeEvent(event);
 }
 
-// static bool s_mousePressed = false;
 //============================================================================
 void CFloatingDockContainer::moveEvent(QMoveEvent* event)
 {
-    Super::moveEvent(event);
-    if (!d->IsResizing && event->spontaneous() && d->MousePressed)
-    {
-        d->setState(DraggingFloatingWidget);
-        d->updateDropOverlays(QCursor::pos());
-        QApplication::setActiveWindow(this);
-        activateWindow();
-    }
-    d->IsResizing = false;
+	Super::moveEvent(event);
 }
 
 //============================================================================
 bool CFloatingDockContainer::event(QEvent* e)
 {
-    bool result = Super::event(e);
-    switch (e->type())
-    {
+	bool result = Super::event(e);
+	switch (e->type())
+	{
 	case QEvent::ActivationChange:
 	case QEvent::Show:
 		{
 			if (e->type() == QEvent::ActivationChange && window()->isActiveWindow()
 				|| e->type() == QEvent::Show && !dockContainer()->zOrderWidgetIndex())
 			{
-				if ((isFloating() && dockContainer()->hasIndependentWidget()) || qobject_cast<CDockManager*>(this))
+				if ((isWindow() && dockContainer()->hasIndependentWidget())
+					|| qobject_cast<CDockManager*>(this))
 				{
 					dockContainer()->setZOrderWindowIndex(++zOrderWindowCounter);
 				}
@@ -1676,244 +1534,38 @@ bool CFloatingDockContainer::event(QEvent* e)
 				return true;
 			}
 		}
-	break;
-    case QEvent::WindowActivate:
-		{
-			d->MousePressed = false;
-		}
-	break;
-    case QEvent::WindowDeactivate: d->MousePressed = true; break;
-    default: break;
-    }
-    return result;
-}
-
-//============================================================================
-void CFloatingDockContainer::region(const QPoint& cursorGlobalPoint)
-{
-    QRect rect = this->contentsRect();
-    rect.setLeft(rect.left() + d->TransparentMargins.left());
-    rect.setTop(rect.top() + d->TransparentMargins.top());
-    rect.setRight(rect.right() - d->TransparentMargins.right());
-    rect.setBottom(rect.bottom() - d->TransparentMargins.bottom());
-
-    QPoint tl = mapToGlobal(rect.topLeft());
-    QPoint rb = mapToGlobal(rect.bottomRight());
-    int x = cursorGlobalPoint.x();
-    int y = cursorGlobalPoint.y();
-
-    if (tl.x() - d->ResizeRegionPadding >= x && tl.x() <= x
-        && tl.y() - d->ResizeRegionPadding >= y && tl.y() <= y)
-    {
-        d->CursorDirection = FloatingDockContainerPrivate::eDirection::LEFTTOP;
-        this->setCursor(QCursor(Qt::SizeFDiagCursor));
-    }
-    else if (x >= rb.x() + d->ResizeRegionPadding && x <= rb.x()
-             && y >= rb.y() + d->ResizeRegionPadding && y <= rb.y())
-    {
-        d->CursorDirection =
-            FloatingDockContainerPrivate::eDirection::RIGHTBOTTOM;
-        this->setCursor(QCursor(Qt::SizeFDiagCursor));
-    }
-    else if (x <= tl.x() - d->ResizeRegionPadding && x >= tl.x()
-             && y >= rb.y() + d->ResizeRegionPadding && y <= rb.y())
-    {
-        d->CursorDirection = FloatingDockContainerPrivate::eDirection::LEFTBOTTOM;
-        this->setCursor(QCursor(Qt::SizeBDiagCursor));
-    }
-    else if (x <= rb.x() && x >= rb.x() + d->ResizeRegionPadding && y >= tl.y()
-             && y <= tl.y() - d->ResizeRegionPadding)
-    {
-        d->CursorDirection = FloatingDockContainerPrivate::eDirection::RIGHTTOP;
-        this->setCursor(QCursor(Qt::SizeBDiagCursor));
-    }
-    else if (x <= tl.x() - d->ResizeRegionPadding && x >= tl.x())
-    {
-        d->CursorDirection = FloatingDockContainerPrivate::eDirection::LEFT;
-        this->setCursor(QCursor(Qt::SizeHorCursor));
-    }
-    else if (x <= rb.x() && x >= rb.x() + d->ResizeRegionPadding)
-    {
-        d->CursorDirection = FloatingDockContainerPrivate::eDirection::RIGHT;
-        this->setCursor(QCursor(Qt::SizeHorCursor));
-    }
-    else if (y >= tl.y() && y <= tl.y() - d->ResizeRegionPadding)
-    {
-        d->CursorDirection = FloatingDockContainerPrivate::eDirection::UP;
-        this->setCursor(QCursor(Qt::SizeVerCursor));
-    }
-    else if (y <= rb.y() && y >= rb.y() + d->ResizeRegionPadding)
-    {
-        d->CursorDirection = FloatingDockContainerPrivate::eDirection::DOWN;
-        this->setCursor(QCursor(Qt::SizeVerCursor));
-    }
-    else
-    {
-        d->CursorDirection = FloatingDockContainerPrivate::eDirection::NONE;
-        this->setCursor(QCursor(Qt::ArrowCursor));
-    }
+		break;
+	default:
+		break;
+	}
+	return result;
 }
 
 //============================================================================
 void CFloatingDockContainer::mousePressEvent(QMouseEvent* event)
 {
-    if (d->DockManager->testConfigFlag(CDockManager::FloatingShadowEnabled))
-    {
-        if (event->button() == Qt::LeftButton)
-        {
-            if (d->CursorDirection
-                != FloatingDockContainerPrivate::eDirection::NONE)
-            {
-                d->LeftMBPressed = true;
-                // this->grabMouse();
-            }
-            else
-            {
-                QWidget* action =
-                    QApplication::widgetAt(internal::globalPositionOf(event));
-                if (action)
-                {
-                    if (action == d->TitleBar)
-                    {
-                        d->LeftMBPressed = true;
-                        d->DragStartPosition =
-                            mapToParent(
-                                mapFromGlobal(internal::globalPositionOf(event)))
-                            - frameGeometry().topLeft()
-                            - QPoint(d->ResizeRegionPadding,
-                                     d->ResizeRegionPadding);
-                    }
-                }
-            }
-        }
-    }
-    return Super::mousePressEvent(event);
+	return Super::mousePressEvent(event);
 }
 
 //============================================================================
 void CFloatingDockContainer::mouseReleaseEvent(QMouseEvent* event)
 {
-    if (d->DockManager->testConfigFlag(CDockManager::FloatingShadowEnabled))
-    {
-        d->LeftMBPressed = false;
-        if (d->CursorDirection != FloatingDockContainerPrivate::eDirection::NONE)
-        {
-            d->CursorDirection = FloatingDockContainerPrivate::eDirection::NONE;
-            // this->releaseMouse();
-            this->setCursor(QCursor(Qt::ArrowCursor));
-        }
-    }
-    return Super::mouseReleaseEvent(event);
+	return Super::mouseReleaseEvent(event);
 }
 
 //============================================================================
 void CFloatingDockContainer::mouseMoveEvent(QMouseEvent* event)
 {
-    if (d->DockManager->testConfigFlag(CDockManager::FloatingShadowEnabled))
-    {
-        QPoint globalPoint = internal::globalPositionOf(event);
-        if (d->LeftMBPressed)
-        {
-            bool bIgnore = true;
-            QList<QScreen*> screens = QGuiApplication::screens();
-            for (int i = 0; i < screens.size(); i++)
-            {
-                QScreen* pScreen = screens[i];
-                QRect geometryRect = pScreen->availableGeometry();
-                if (geometryRect.contains(globalPoint))
-                {
-                    bIgnore = false;
-                    break;
-                }
-            }
-
-            if (bIgnore)
-            {
-                event->ignore();
-                return;
-            }
-
-            if (d->CursorDirection
-                != FloatingDockContainerPrivate::eDirection::NONE)
-            {
-                QRect rect = this->rect();
-                QPoint tl = mapToGlobal(rect.topLeft());
-                QPoint rb = mapToGlobal(rect.bottomRight());
-
-                QRect rMove(tl, rb);
-
-                switch (d->CursorDirection)
-                {
-                case FloatingDockContainerPrivate::eDirection::LEFT:
-                    if (rb.x() - globalPoint.x() <= this->minimumWidth())
-                        rMove.setX(tl.x());
-                    else
-                        rMove.setX(globalPoint.x());
-                    break;
-                case FloatingDockContainerPrivate::eDirection::RIGHT:
-                    rMove.setWidth(globalPoint.x() - tl.x());
-                    break;
-                case FloatingDockContainerPrivate::eDirection::UP:
-                    if (rb.y() - globalPoint.y() <= this->minimumHeight())
-                        rMove.setY(tl.y());
-                    else
-                        rMove.setY(globalPoint.y());
-                    break;
-                case FloatingDockContainerPrivate::eDirection::DOWN:
-                    rMove.setHeight(globalPoint.y() - tl.y());
-                    break;
-                case FloatingDockContainerPrivate::eDirection::LEFTTOP:
-                    if (rb.x() - globalPoint.x() <= this->minimumWidth())
-                        rMove.setX(tl.x());
-                    else
-                        rMove.setX(globalPoint.x());
-                    if (rb.y() - globalPoint.y() <= this->minimumHeight())
-                        rMove.setY(tl.y());
-                    else
-                        rMove.setY(globalPoint.y());
-                    break;
-                case FloatingDockContainerPrivate::eDirection::RIGHTTOP:
-                    rMove.setWidth(globalPoint.x() - tl.x());
-                    rMove.setY(globalPoint.y());
-                    break;
-                case FloatingDockContainerPrivate::eDirection::LEFTBOTTOM:
-                    rMove.setX(globalPoint.x());
-                    rMove.setHeight(globalPoint.y() - tl.y());
-                    break;
-                case FloatingDockContainerPrivate::eDirection::RIGHTBOTTOM:
-                    rMove.setWidth(globalPoint.x() - tl.x());
-                    rMove.setHeight(globalPoint.y() - tl.y());
-                    break;
-                default: break;
-                }
-                rMove.moveTopLeft(
-                    rMove.topLeft()
-                    + QPoint(d->ResizeRegionPadding, d->ResizeRegionPadding));
-                this->setGeometry(rMove);
-            }
-            else
-            {
-                this->move(
-                    mapToParent(mapFromGlobal(internal::globalPositionOf(event)))
-                    - d->DragStartPosition);
-                event->accept();
-            }
-        }
-        else
-        {
-            region(globalPoint);
-        }
-    }
-    Super::mouseMoveEvent(event);
+	Super::mouseMoveEvent(event);
 }
 
 //============================================================================
 bool CFloatingDockContainer::hasNativeTitleBar()
 {
-    return d->TitleBar == nullptr;
+	return true;
 }
 
-}  // namespace ads
+} // namespace ads
 
 //---------------------------------------------------------------------------
 // EOF FloatingDockContainer.cpp

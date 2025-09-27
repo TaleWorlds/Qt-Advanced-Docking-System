@@ -38,6 +38,7 @@
 #include "DockingStateReader.h"
 #include "FloatingDockContainer.h"
 #include "IconProvider.h"
+#include "MergedDockWidget.h"
 #include "ads_globals.h"
 
 #include <AutoHideDockContainer.h>
@@ -79,15 +80,30 @@ static void initResource()
 
 namespace ads
 {
+#ifndef setFlag_ads_CDockManager_ConfigFlags
+#define setFlag_ads_CDockManager_ConfigFlags
+template ADS_EXPORT void internal::setFlag(ads::CDockManager::ConfigFlags& Flags,
+										   typename ads::CDockManager::ConfigFlags::enum_type flag,
+										   bool on);
+#endif
+
+#ifndef setFlag_ads_CDockManager_AutoHideFlags
+#define setFlag_ads_CDockManager_AutoHideFlags
+template ADS_EXPORT void internal::setFlag(ads::CDockManager::AutoHideFlags& Flags,
+										   typename ads::CDockManager::AutoHideFlags::enum_type flag,
+										   bool on);
+#endif
+
 /**
  * Internal file version in case the structure changes internally
  */
 enum eStateFileVersion
 {
-	InitialVersion = 0,		  //!< InitialVersion
-	Version1 = 1,			  //!< Version1
+	InitialVersion = 0, //!< InitialVersion
+	Version1 = 1,		//!< Version1
 	Version2 = 2,
-	CurrentVersion = Version2 //!< CurrentVersion
+	Version3 = 3,
+	CurrentVersion = Version3 //!< CurrentVersion
 };
 
 static CDockManager::ConfigFlags StaticConfigFlags = CDockManager::DefaultNonOpaqueConfig;
@@ -124,10 +140,13 @@ struct DockManagerPrivate
     QSize ToolBarIconSizeDocked = QSize(16, 16);
     QSize ToolBarIconSizeFloating = QSize(24, 24);
     CDockWidget::DockWidgetFeatures LockedDockWidgetFeatures;
+    WindowActivateEventFilter* WindowActivateEventFilterObj;
+	PaletteEventFilter* PaletteEventFilterObj;
     /**
      * Private data constructor
      */
     DockManagerPrivate(CDockManager* _public);
+    ~DockManagerPrivate();
 
     /**
      * Checks if the given data stream is a valid docking system state
@@ -148,6 +167,7 @@ struct DockManagerPrivate
     void restoreDockWidgetsOpenState();
     void restoreDockAreasIndices();
     void emitTopLevelEvents();
+    void splitMergedWidgets();
 
     void hideFloatingWidgets()
     {
@@ -175,7 +195,7 @@ struct DockManagerPrivate
     bool restoreContainer(int Index, CDockingStateReader& stream, bool Testing);
 
     /**
-     * Loads the stylesheet
+     * Loads the style and icons
      */
 	void loadStyle();
 
@@ -187,10 +207,56 @@ struct DockManagerPrivate
 
 // struct DockManagerPrivate
 
+class WindowActivateEventFilter : public QObject
+{
+public:
+	CDockManager* mThis;
+
+	bool eventFilter(QObject* obj, QEvent* e) override
+	{
+		if (e->type() == QEvent::Type::ActivationChange)
+		{
+			QMainWindow* mainWindow = qobject_cast<QMainWindow*>(obj);
+			if (mainWindow && mainWindow->isActiveWindow())
+			{
+				mThis->onMainWindowActivated();
+			}
+		}
+		return QObject::eventFilter(obj, e);
+	}
+};
+
+// class WindowActivateEventFilter
+
+class PaletteEventFilter : public QObject
+{
+public:
+	CDockManager* mThis;
+
+	bool eventFilter(QObject* obj, QEvent* e) override
+	{
+		if (obj == qApp && e->type() == QEvent::Type::ApplicationPaletteChange)
+		{
+			mThis->d->loadStyle();
+			return false;
+		}
+		return QObject::eventFilter(obj, e);
+	}
+};
+
+// class PaletteEventFilter
+ 
 //============================================================================
 DockManagerPrivate::DockManagerPrivate(CDockManager* _public)
 	: _this(_public)
 {
+}
+
+//============================================================================
+DockManagerPrivate::~DockManagerPrivate()
+{
+	delete WindowActivateEventFilterObj;
+	delete PaletteEventFilterObj;
 }
 
 //============================================================================
@@ -215,44 +281,46 @@ void DockManagerPrivate::loadStyle()
 }
 	else
 	{
-        bool lightTheme =
-            QApplication::palette().color(QPalette::ColorRole::Base).lightnessF()
-            > 0.5f;
+        _this->iconProvider().clear();
+		auto baseCol = QApplication::palette().color(QPalette::ColorRole::Base);
+		auto highlightCol = QApplication::palette().color(QPalette::ColorRole::Highlight);
+		bool lightTheme = (baseCol.red() * 0.299 + baseCol.green() * 0.587 + baseCol.blue() * 0.114) > 150;
+		bool brightHighlight = (highlightCol.red() * 0.299 + highlightCol.green() * 0.587 + highlightCol.blue() * 0.114) > 150;
 		QIcon autoHideIcon;
         if (lightTheme)
         {
-            autoHideIcon.addFile(":/ads/images/vs-pin-button.svg", QSize(16, 16),
-                                 QIcon::Normal, QIcon::Off);
-            autoHideIcon.addFile(":/ads/images/vs-pin-button-pinned.svg",
-                                 QSize(16, 16), QIcon::Normal, QIcon::On);
-            autoHideIcon.addFile(":/ads/images/vs-pin-button-disabled.svg",
-                                 QSize(16, 16), QIcon::Disabled, QIcon::Off);
+			autoHideIcon.addFile(":/ads/images/vs-pin-button.svg", QSize(16, 16), QIcon::Normal, QIcon::Off);
+			autoHideIcon.addFile(":/ads/images/vs-pin-button-pinned.svg", QSize(16, 16), QIcon::Normal, QIcon::On);
+			autoHideIcon.addFile(":/ads/images/vs-pin-button-disabled.svg", QSize(16, 16), QIcon::Disabled, QIcon::Off);
         }
         else
         {
-            autoHideIcon.addFile(":/ads/images/vs-pin-button-focused.svg", QSize(16, 16),
-                                 QIcon::Normal, QIcon::Off);
-            autoHideIcon.addFile(":/ads/images/vs-pin-button-pinned-focused.svg",
-                                 QSize(16, 16), QIcon::Normal, QIcon::On);
-            autoHideIcon.addFile(":/ads/images/vs-pin-button-disabled.svg",
-                                 QSize(16, 16), QIcon::Disabled, QIcon::Off);
+			autoHideIcon.addFile(":/ads/images/vs-pin-button-focused.svg", QSize(16, 16), QIcon::Normal, QIcon::Off);
+			autoHideIcon.addFile(":/ads/images/vs-pin-button-pinned-focused.svg", QSize(16, 16), QIcon::Normal, QIcon::On);
+			autoHideIcon.addFile(":/ads/images/vs-pin-button-disabled.svg", QSize(16, 16), QIcon::Disabled, QIcon::Off);
         }
 		_this->iconProvider().registerCustomIcon(ads::eIcon::AutoHideIcon, autoHideIcon);
 
         QIcon closeIcon;
 		if (lightTheme)
         {
-            closeIcon.addFile(":/ads/images/close-button.svg", QSize(16, 16),
-                              QIcon::Normal, QIcon::Off);
-            closeIcon.addFile(":/ads/images/close-disabled.svg", QSize(16, 16),
-                              QIcon::Disabled, QIcon::Off);
+			closeIcon.addFile(":/ads/images/close-button.svg", QSize(16, 16), QIcon::Normal, QIcon::Off);
+			closeIcon.addFile(":/ads/images/close-disabled.svg", QSize(16, 16), QIcon::Disabled, QIcon::Off);
         }
         else
         {
-            closeIcon.addFile(":/ads/images/close-button-focused.svg", QSize(16, 16),
-                              QIcon::Normal, QIcon::Off);
-            closeIcon.addFile(":/ads/images/close-disabled.svg", QSize(16, 16),
-                              QIcon::Disabled, QIcon::Off);
+			closeIcon.addFile(":/ads/images/close-button-focused.svg", QSize(16, 16), QIcon::Normal, QIcon::Off);
+			closeIcon.addFile(":/ads/images/close-disabled.svg", QSize(16, 16), QIcon::Disabled, QIcon::Off);
+        }
+        if (brightHighlight)
+		{
+			closeIcon.addFile(":/ads/images/close-button.svg", QSize(16, 16), QIcon::Selected, QIcon::Off);
+			closeIcon.addFile(":/ads/images/close-button-focused.svg", QSize(16, 16), QIcon::Active, QIcon::Off);
+        }
+        else
+		{
+			closeIcon.addFile(":/ads/images/close-button-focused.svg", QSize(16, 16), QIcon::Selected, QIcon::Off);
+			closeIcon.addFile(":/ads/images/close-button-focused.svg", QSize(16, 16), QIcon::Active, QIcon::Off);
         }
 		_this->iconProvider().registerCustomIcon(ads::eIcon::TabCloseIcon, closeIcon);
 		_this->iconProvider().registerCustomIcon(ads::eIcon::DockAreaCloseIcon, closeIcon);
@@ -260,34 +328,26 @@ void DockManagerPrivate::loadStyle()
 		QIcon menuIcon;
         if (lightTheme)
         {
-            menuIcon.addFile(":/ads/images/downarrow.svg", QSize(16, 16),
-                             QIcon::Normal, QIcon::Off);
-            menuIcon.addFile(":/ads/images/downarrow-diasbled.svg", QSize(16, 16),
-                             QIcon::Disabled, QIcon::Off);
+			menuIcon.addFile(":/ads/images/downarrow.svg", QSize(16, 16), QIcon::Normal, QIcon::Off);
+			menuIcon.addFile(":/ads/images/downarrow-diasbled.svg", QSize(16, 16), QIcon::Disabled, QIcon::Off);
         }
         else
         {
-            menuIcon.addFile(":/ads/images/downarrow-focused.svg", QSize(16, 16),
-                             QIcon::Normal, QIcon::Off);
-            menuIcon.addFile(":/ads/images/downarrow-diasbled.svg", QSize(16, 16),
-                             QIcon::Disabled, QIcon::Off);
+			menuIcon.addFile(":/ads/images/downarrow-focused.svg", QSize(16, 16), QIcon::Normal, QIcon::Off);
+			menuIcon.addFile(":/ads/images/downarrow-diasbled.svg", QSize(16, 16), QIcon::Disabled, QIcon::Off);
 		}
 		_this->iconProvider().registerCustomIcon(ads::eIcon::DockAreaMenuIcon, menuIcon);
 
 		QIcon normalIcon;
         if (lightTheme)
         {
-            normalIcon.addFile(":/ads/images/detach-button.svg", QSize(16, 16),
-                               QIcon::Normal, QIcon::Off);
-            normalIcon.addFile(":/ads/images/detach-button-disabled.svg",
-                               QSize(16, 16), QIcon::Disabled, QIcon::Off);
+			normalIcon.addFile(":/ads/images/detach-button.svg", QSize(16, 16), QIcon::Normal, QIcon::Off);
+			normalIcon.addFile(":/ads/images/detach-button-disabled.svg", QSize(16, 16), QIcon::Disabled, QIcon::Off);
         }
         else
         {
-            normalIcon.addFile(":/ads/images/detach-button-focused.svg", QSize(16, 16),
-                               QIcon::Normal, QIcon::Off);
-            normalIcon.addFile(":/ads/images/detach-button-disabled.svg",
-                               QSize(16, 16), QIcon::Disabled, QIcon::Off);
+			normalIcon.addFile(":/ads/images/detach-button-focused.svg", QSize(16, 16), QIcon::Normal, QIcon::Off);
+			normalIcon.addFile(":/ads/images/detach-button-disabled.svg", QSize(16, 16), QIcon::Disabled, QIcon::Off);
         }
 		_this->iconProvider().registerCustomIcon(ads::eIcon::NormalIcon, normalIcon);
 		_this->iconProvider().registerCustomIcon(ads::eIcon::DockAreaUndockIcon, normalIcon);
@@ -295,42 +355,75 @@ void DockManagerPrivate::loadStyle()
 		QIcon maximizeIcon;
         if (lightTheme)
         {
-            maximizeIcon.addFile(":/ads/images/maximize-button.svg",
-                                 QSize(16, 16), QIcon::Normal, QIcon::Off);
+			maximizeIcon.addFile(":/ads/images/maximize-button.svg", QSize(16, 16), QIcon::Normal, QIcon::Off);
         }
         else
         {
-            maximizeIcon.addFile(":/ads/images/maximize-button-focused.svg",
-                                 QSize(16, 16), QIcon::Normal, QIcon::Off);
+			maximizeIcon.addFile(":/ads/images/maximize-button-focused.svg", QSize(16, 16), QIcon::Normal, QIcon::Off);
         }
 		_this->iconProvider().registerCustomIcon(ads::eIcon::MaximizeIcon, maximizeIcon);
 
 		QIcon minimizeIcon;
         if (lightTheme)
         {
-            minimizeIcon.addFile(":/ads/images/minimize-button.svg",
-                                 QSize(16, 16), QIcon::Normal, QIcon::Off);
+			minimizeIcon.addFile(":/ads/images/minimize-button.svg", QSize(16, 16), QIcon::Normal, QIcon::Off);
         }
         else
         {
-            minimizeIcon.addFile(":/ads/images/minimize-button-focused.svg",
-                                 QSize(16, 16), QIcon::Normal, QIcon::Off);
+			minimizeIcon.addFile(":/ads/images/minimize-button-focused.svg", QSize(16, 16), QIcon::Normal, QIcon::Off);
         }
 		_this->iconProvider().registerCustomIcon(ads::eIcon::DockAreaMinimizeIcon, minimizeIcon);
 
 		QIcon addIcon;
         if (lightTheme)
         {
-            addIcon.addFile(":/ads/images/plus.svg", QSize(16, 16), QIcon::Normal,
-                            QIcon::Off);
+			addIcon.addFile(":/ads/images/plus.svg", QSize(16, 16), QIcon::Normal, QIcon::Off);
         }
         else
         {
-            addIcon.addFile(":/ads/images/plus-focused.svg", QSize(16, 16), QIcon::Normal,
-                            QIcon::Off);
+			addIcon.addFile(":/ads/images/plus-focused.svg", QSize(16, 16), QIcon::Normal, QIcon::Off);
         }
 		_this->iconProvider().registerCustomIcon(ads::eIcon::AddIcon, addIcon);
+		if (ContainerOverlay)
+		{
+			ContainerOverlay->updateOverlayCross();
+		}
+		if (DockAreaOverlay)
+		{
+			DockAreaOverlay->updateOverlayCross();
+		}
+		for (auto floatingWid : FloatingWidgets)
+		{
+			if (floatingWid && floatingWid->containerOverlay() && floatingWid->containerOverlay() != ContainerOverlay)
+			{
+				floatingWid->containerOverlay()->updateOverlayCross();
+			}
+			if (floatingWid && floatingWid->dockAreaOverlay() && floatingWid->dockAreaOverlay() != DockAreaOverlay)
+			{
+				floatingWid->dockAreaOverlay()->updateOverlayCross();
+			}
+		}
 
+		if (ContainerOverlay)
+		{
+			ContainerOverlay->updateOverlayCross();
+	}
+		if (DockAreaOverlay)
+		{
+			DockAreaOverlay->updateOverlayCross();
+}
+		for (auto floatingWid : FloatingWidgets)
+		{
+			if (floatingWid && floatingWid->containerOverlay() && floatingWid->containerOverlay() != ContainerOverlay)
+			{
+				floatingWid->containerOverlay()->updateOverlayCross();
+			}
+			if (floatingWid && floatingWid->dockAreaOverlay() && floatingWid->dockAreaOverlay() != DockAreaOverlay)
+			{
+				floatingWid->dockAreaOverlay()->updateOverlayCross();
+			}
+
+		}
 	}
 }
 
@@ -370,8 +463,7 @@ bool DockManagerPrivate::restoreContainer(int Index, CDockingStateReader& stream
                 FloatingWidget->dockContainer()->fetchIndependentCount();
                 int newIdx = FloatingWidgets.indexOf(FloatingWidget);
                 FloatingWidgets.erase(FloatingWidgets.begin() + newIdx);
-                FloatingWidgets.insert(FloatingWidgets.begin() + idx,
-                                       FloatingWidget);
+				FloatingWidgets.insert(FloatingWidgets.begin() + idx, FloatingWidget);
             }
         }
         else
@@ -396,8 +488,6 @@ bool DockManagerPrivate::checkFormat(const QByteArray& state, int version)
 //============================================================================
 bool DockManagerPrivate::restoreStateFromXml(const QByteArray& state, int version, bool Testing)
 {
-    Q_UNUSED(version);
-
     if (state.isEmpty())
     {
         return false;
@@ -423,9 +513,12 @@ bool DockManagerPrivate::restoreStateFromXml(const QByteArray& state, int versio
     if (!s.attributes().value("UserVersion").isEmpty())
     {
         v = s.attributes().value("UserVersion").toInt(&ok);
-        if (!ok || v != version)
-        {
-            return false;
+        if (!(ok && v == 2 && version == 3))
+		{
+			if (!ok || v != version)
+			{
+				return false;
+			}
         }
     }
 
@@ -579,6 +672,24 @@ void DockManagerPrivate::emitTopLevelEvents()
 }
 
 //============================================================================
+void DockManagerPrivate::splitMergedWidgets()
+{
+    QList<CMergedDockWidget*> MergedDockWidgets;
+    for (auto DockWidget : DockWidgetsMap)
+	{
+        if (qobject_cast<CMergedDockWidget*>(DockWidget))
+		{
+            MergedDockWidgets.push_back(qobject_cast<CMergedDockWidget*>(DockWidget));
+        }
+    }
+    for (auto MergedDockWidget : MergedDockWidgets)
+	{
+		CDockWidget *dockWidget1, *dockWidget2;
+        MergedDockWidget->splitWidgets(dockWidget1, dockWidget2);
+    }
+}
+
+//============================================================================
 bool DockManagerPrivate::restoreState(const QByteArray& State, int version)
 {
     QByteArray state = State.startsWith("<?xml") ? State : qUncompress(State);
@@ -586,12 +697,14 @@ bool DockManagerPrivate::restoreState(const QByteArray& State, int version)
     {
         ADS_PRINT("checkFormat: Error checking format!!!!!!!");
         return false;
-    }
-
+	}
+	// minimize maximized containers
+	_this->minimizeDockWidgets();
+    // Split merged widgets since we dont handle the merged widget cases in restore state
+	splitMergedWidgets();
     // Hide updates of floating widgets from use
     hideFloatingWidgets();
     markDockWidgetsDirty();
-
     if (!restoreStateFromXml(state, version))
     {
         ADS_PRINT("restoreState: Error restoring state!!!!!!!");
@@ -658,6 +771,10 @@ CDockManager::CDockManager(QWidget* parent)
         d->FocusController = new CDockFocusController(this);
     }
 
+	PaletteEventFilter* pfilterObj = new PaletteEventFilter;
+    pfilterObj->mThis = this;
+    d->PaletteEventFilterObj = pfilterObj;
+    qApp->installEventFilter(pfilterObj);
     window()->installEventFilter(this);
 	connect(qApp,
 			&QApplication::focusWindowChanged,
@@ -670,29 +787,12 @@ CDockManager::CDockManager(QWidget* parent)
             focusWindow->raise();
         }
     });
-	QObject::connect((QGuiApplication*)QGuiApplication::instance(),
-		&QGuiApplication::applicationStateChanged,
-		this, &CDockManager::onApplicationStateChanged);
-	class TempEventFilter : public QObject
+    WindowActivateEventFilter* filterObj = new WindowActivateEventFilter;
+	filterObj->mThis = this;
+	if (MainWindow)
 	{
-	public:
-		CDockManager* mThis;
-		bool eventFilter(QObject* obj, QEvent* e) override
-		{
-			if (e->type() == QEvent::Type::ActivationChange)
-			{
-				QMainWindow* mainWindow = qobject_cast<QMainWindow*>(obj);
-				if (mainWindow->isActiveWindow())
-				{
-					mThis->onMainWindowActivated();
-}
-			}
-			return QObject::eventFilter(obj, e);
-		}
-	};
-	TempEventFilter filterObj;
-	filterObj.mThis = this;
-	MainWindow->installEventFilter(&filterObj);
+		MainWindow->installEventFilter(filterObj);
+	}
 }
 
 //============================================================================
@@ -846,28 +946,6 @@ bool CDockManager::eventFilter(QObject* obj, QEvent* e)
 }
 #endif
 
-void CDockManager::onApplicationStateChanged(Qt::ApplicationState newState)
-{
-	if (newState == Qt::ApplicationActive)
-	{
-		QList<CDockContainerWidget*> sorted(d->Containers.begin(), d->Containers.end());
-
-		struct CompareContainers
-		{
-			bool operator()(CDockContainerWidget*& lhs, CDockContainerWidget*& rhs)
-			{
-				return rhs->isInFrontOf(lhs);
-			}
-		};
-
-		std::sort(sorted.begin(), sorted.end(), CompareContainers());
-		for (auto* container : sorted)
-		{
-			container->raise();
-		}
-	}
-}
-
 void CDockManager::onMainWindowActivated()
 {
 	setZOrderWidgetIndex(zOrderWidgetCounter);
@@ -944,6 +1022,20 @@ const QList<CFloatingDockContainer*> CDockManager::floatingWidgets() const
             res.append(fl);
     }
     return res;
+}
+
+//============================================================================
+const QList<ads::CMergedDockWidget*> CDockManager::mergedWidgets() const
+{
+	QList<CMergedDockWidget*> res;
+	for (auto& dw : d->DockWidgetsMap)
+	{
+		if (auto mdw = qobject_cast<CMergedDockWidget*>(dw))
+		{
+            res.append(mdw);
+        }
+	}
+	return res;
 }
 
 //============================================================================
@@ -1195,21 +1287,35 @@ void CDockManager::removeDockWidget(CDockWidget* Dockwidget)
 }
 
 //============================================================================
+void CDockManager::splitMergedWidgets()
+{
+    d->splitMergedWidgets();
+}
+
+//============================================================================
+void CDockManager::minimizeDockWidgets()
+{
+    for (auto Container : d->Containers)
+	{
+        Container->minimizeCurrent();
+    }
+}
+
+//============================================================================
 QMap<QString, CDockWidget*> CDockManager::dockWidgetsMap() const
 {
     return d->DockWidgetsMap;
 }
 
 //============================================================================
-void CDockManager::addPerspective(const QString& UniquePrespectiveName)
+void CDockManager::addPerspective(const QString& UniquePrespectiveName, int userLayoutVersion)
 {
-    d->Perspectives.insert(UniquePrespectiveName, saveState(CurrentVersion));
+    d->Perspectives.insert(UniquePrespectiveName, saveState(userLayoutVersion));
     Q_EMIT perspectiveListChanged();
 }
 
 //============================================================================
-void CDockManager::addPerspective(const QString& UniquePrespectiveName,
-                                  const QByteArray& PerspectiveData)
+void CDockManager::addPerspective(const QString& UniquePrespectiveName, const QByteArray& PerspectiveData)
 {
     d->Perspectives.insert(UniquePrespectiveName, PerspectiveData);
     Q_EMIT perspectiveListChanged();
@@ -1244,7 +1350,7 @@ QStringList CDockManager::perspectiveNames() const
 }
 
 //============================================================================
-void CDockManager::openPerspective(const QString& PerspectiveName)
+void CDockManager::openPerspective(const QString& PerspectiveName, int layoutVersion)
 {
     const auto Iterator = d->Perspectives.find(PerspectiveName);
     if (d->Perspectives.end() == Iterator)
@@ -1253,7 +1359,7 @@ void CDockManager::openPerspective(const QString& PerspectiveName)
     }
 
     Q_EMIT openingPerspective(PerspectiveName);
-    restoreState(Iterator.value(), CurrentVersion);
+    restoreState(Iterator.value(), layoutVersion);
     Q_EMIT perspectiveOpened(PerspectiveName);
 }
 
@@ -1423,7 +1529,7 @@ void CDockManager::clearViewMenu()
         Group->deleteLater();
     }
     d->ViewMenuGroups.clear();
-    d->ViewMenu->clear();
+	d->ViewMenu->clear();
 }
 
 //============================================================================
@@ -1438,6 +1544,19 @@ void CDockManager::resetViewMenu()
     d->ViewMenu->deleteLater();
     d->ViewMenu = new QMenu(tr("Show View"), this);
 }
+
+//============================================================================
+void CDockManager::restartViewMenu()
+{
+	for (auto Group : d->ViewMenuGroups)
+	{
+		Group->deleteLater();
+	}
+	d->ViewMenuGroups.clear();
+	d->ViewMenu->clear();
+	Q_EMIT viewMenuReset();
+}
+
 //============================================================================
 void CDockManager::setViewMenuInsertionOrder(eViewMenuInsertionOrder Order)
 {
@@ -1508,6 +1627,12 @@ CIconProvider& CDockManager::iconProvider()
 {
     static CIconProvider Instance;
     return Instance;
+}
+
+//===========================================================================
+int CDockManager::stateFileVersion()
+{
+    return (int)eStateFileVersion::CurrentVersion;
 }
 
 //===========================================================================

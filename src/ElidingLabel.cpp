@@ -32,6 +32,11 @@
 
 namespace ads
 {
+#ifndef setToolTip_CElidingLabel
+#define setToolTip_CElidingLabel
+template ADS_EXPORT void internal::setToolTip(CElidingLabel* obj, const QString& tip);
+#endif
+
 /**
  * Private data of public CClickableLabel
  */

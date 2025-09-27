@@ -1,3 +1,4 @@
+#pragma once
 #ifndef AutoHideTabH
 #define AutoHideTabH
 /*******************************************************************************
@@ -65,7 +66,9 @@ private:
 
 private Q_SLOTS:
     void onAutoHideToActionClicked();
-    void onCloseButtonClicked();
+	void onCloseButtonClicked();
+	void mergeDockWidget();
+	void splitDockWidget();
 
 protected:
     void setSideBar(CAutoHideSideBar* SideTabBar);

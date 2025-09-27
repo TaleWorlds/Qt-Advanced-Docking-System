@@ -32,6 +32,7 @@
 #include <QPainter>
 #include <QStyle>
 #include <QVariant>
+#include <QtGui/qevent.h>
 
 #include "DockManager.h"
 #include "DockSplitter.h"
@@ -50,6 +51,15 @@ namespace ads
 
 namespace internal
 {
+#ifndef ads_CDockSplitter_findParent
+#define ads_CDockSplitter_findParent
+template ADS_EXPORT CDockSplitter* internal::findParent(const QWidget* w);
+#endif
+const bool RestoreTesting = true;
+const bool Restore = false;
+const char* const ClosedProperty = "close";
+const char* const DirtyProperty = "dirty";
+const char* const LocationProperty = "Location";
 const int FloatingWidgetDragStartEvent = QEvent::registerEventType();
 const int DockedWidgetDragStartEvent = QEvent::registerEventType();
 const int AutoHideAreaWidth = 32;
@@ -394,6 +404,8 @@ QPixmap createTransparentPixmap(const QPixmap& Source, qreal Opacity)
 }
 
 //============================================================================
+
+
 void hideEmptyParentSplitters(CDockSplitter* Splitter)
 {
     while (Splitter && Splitter->isVisible())
@@ -404,6 +416,16 @@ void hideEmptyParentSplitters(CDockSplitter* Splitter)
         }
         Splitter = internal::findParent<CDockSplitter*>(Splitter);
     }
+}
+
+//============================================================================
+QPoint globalPositionOf(QMouseEvent* ev)
+{
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+	return ev->globalPosition().toPoint();
+#else
+	return ev->globalPos();
+#endif
 }
 
 //============================================================================
@@ -466,17 +488,33 @@ QRect globalGeometry(QWidget* w)
     return g;
 }
 
-CFloatingWidgetDragStartEvent::CFloatingWidgetDragStartEvent(QEvent::Type type,
-                                                             QWidget* contnt)
-    : QEvent(type), mContent(contnt)
-{}
+ CFloatingWidgetDragStartEvent::CFloatingWidgetDragStartEvent(QEvent::Type type, QWidget* contnt)
+	: QEvent(type)
+	, mContent(contnt)
+{
+}
 
 QWidget* CFloatingWidgetDragStartEvent::content() const
 {
-    return mContent;
+	return mContent;
 }
 
 Q_IMPL_EVENT_COMMON(CFloatingWidgetDragStartEvent)
+
+Qt::Orientation CDockInsertParam::orientation() const
+{
+	return this->first;
+}
+
+bool CDockInsertParam::append() const
+{
+	return this->second;
+}
+
+int CDockInsertParam::insertOffset() const
+{
+	return append() ? 1 : 0;
+}
 
 }  // namespace internal
 }  // namespace ads

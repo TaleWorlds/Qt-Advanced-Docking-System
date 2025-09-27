@@ -1,5 +1,7 @@
-#ifndef MAINWINDOW_H
-#define MAINWINDOW_H
+#pragma once
+
+#ifndef MergedDockWidgetH
+#define MergedDockWidgetH
 /*******************************************************************************
 ** Qt Advanced Docking System
 ** Copyright (C) 2017 Uwe Kindler
@@ -18,57 +20,46 @@
 ** License along with this library; If not, see <http://www.gnu.org/licenses/>.
 ******************************************************************************/
 
-
 //============================================================================
-/// \file   MainWindow.h
-/// \author Uwe Kindler
-/// \date   13.02.2018
-/// \brief  Declaration of CMainWindow class
+/// \file   MergedDockWidget.h
+/// \author TaleWorlds
+/// \date   14.05.2025
+/// \brief  Declaration of CMergedDockWidget class
 //============================================================================
-
 
 //============================================================================
 //                                   INCLUDES
 //============================================================================
-#include <QMainWindow>
+#include "DockWidget.h"
 
-
-
-struct MainWindowPrivate;
-
+namespace ads
+{
+struct MergedDockWidgetPrivate;
 
 /**
- * Simple main window for demo
+ * Merged dock widget that contains two dock widgets 
+ * stacked on top of each other. Can be either vertical or horizontal
  */
-class CMainWindow : public QMainWindow
+class ADS_EXPORT CMergedDockWidget : public CDockWidget
 {
 	Q_OBJECT
 private:
-	MainWindowPrivate* d;///< private data - pimpl
-	friend struct MainWindowPrivate;
-
-protected:
-	virtual void closeEvent(QCloseEvent* event) override;
-
+	MergedDockWidgetPrivate* d;  ///< private data (pimpl)
+	friend struct MergedDockWidgetPrivate;
 public:
-	explicit CMainWindow(QWidget *parent = 0);
-	virtual ~CMainWindow();
+	CMergedDockWidget(CDockWidget* widget1, CDockWidget* widget2, Qt::Orientation orient, QWidget* parent);
+	~CMergedDockWidget();
 
-private slots:
-	void on_actionSaveState_triggered(bool);
-	void on_actionRestoreState_triggered(bool);
-	void savePerspective();
-	void onViewToggled(bool Open);
-	void onViewVisibilityChanged(bool Visible);
-	void createEditor();
-	void createTable();
-	void onEditorCloseRequested();
-	void onImageViewerCloseRequested();
-	void showStatusDialog();
-	void toggleDockWidgetWindowTitle();
-	void applyVsStyle();
-	void createImageViewer();
-	void lockWorkspace(bool Value);
-};
+	void splitWidgets(CDockWidget*& outDockWidget1, CDockWidget*& outDockWidget2);
+	void takeWidgets(QWidget*& outWidget1, QWidget*& outWidget2);
+	void saveState(QXmlStreamWriter& Stream) const override;
+protected:
+	void showEvent(QShowEvent* event) override;
+protected Q_SLOTS:
+	void OnDockWidgetTitleChanged(const QString&);
+};  // class CMergedDockWidget
+}  // namespace ads
 
-#endif // MAINWINDOW_H
+
+//-----------------------------------------------------------------------------
+#endif  // MergedDockWidgetH

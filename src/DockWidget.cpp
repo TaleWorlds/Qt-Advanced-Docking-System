@@ -34,9 +34,11 @@
 #include <QDebug>
 #include <QEvent>
 #include <QGuiApplication>
+#include <QKeyEvent>
 #include <QPointer>
 #include <QScreen>
 #include <QScrollArea>
+#include <QShortcut>
 #include <QSplitter>
 #include <QStack>
 #include <QTextStream>
@@ -63,6 +65,85 @@
 
 namespace ads
 {
+#ifndef setFlag_ads_CDockWidget_DockWidgetFeatures
+#define setFlag_ads_CDockWidget_DockWidgetFeatures
+template ADS_EXPORT void internal::setFlag(ads::CDockWidget::DockWidgetFeatures& Flags,
+										   typename ads::CDockWidget::DockWidgetFeatures::enum_type flag,
+										   bool on);
+#endif
+#ifndef ads_CDockSplitter_findParent
+#define ads_CDockSplitter_findParent
+template ADS_EXPORT CDockSplitter* internal::findParent(const QWidget* w);
+#endif
+#ifndef ads_CFloatingDockContainer_findParent
+#define ads_CFloatingDockContainer_findParent
+template ADS_EXPORT CFloatingDockContainer* internal::findParent(const QWidget* w);
+#endif
+
+/**
+ * Returns the nearest screen to the point, if there is no screen under the point.
+ */
+inline QScreen* ScreenAt(QPoint globalPos)
+{
+	QScreen* guess = QApplication::screenAt(globalPos);
+	if (!guess)
+	{
+		int dist = INT_MAX;
+		QScreen* minDistScr = nullptr;
+		for (auto scr : QApplication::screens())
+		{
+			int dist2;
+			QRect geo = scr->geometry();
+			if (geo.contains(globalPos))
+			{
+				dist2 = 0;
+			}
+			else
+			{
+				int distTop = qAbs(globalPos.y() - geo.top());
+				int distBot = qAbs(globalPos.y() - geo.bottom());
+				int distVert = qMin(distTop, distBot);
+				int distLeft = qAbs(globalPos.x() - geo.left());
+				int distRight = qAbs(globalPos.x() - geo.right());
+				int distHor = qMin(distLeft, distRight);
+				bool isCorner = (globalPos.x() < geo.left() || globalPos.x() > geo.left())
+								&& (globalPos.y() < geo.top() || globalPos.y() > geo.bottom());
+				bool isVert = (globalPos.x() < geo.left() || globalPos.x() > geo.left())
+							  && !(globalPos.y() < geo.top() || globalPos.y() > geo.bottom());
+				bool isHorz = !(globalPos.x() < geo.left() || globalPos.x() > geo.left())
+							  && (globalPos.y() < geo.top() || globalPos.y() > geo.bottom());
+				if (isCorner)
+				{
+					dist2 = distVert + distHor;
+				}
+				else if (isVert)
+				{
+					dist2 = distVert;
+				}
+				else if (isHorz)
+				{
+					dist2 = distHor;
+				}
+			}
+			if (dist2 < dist)
+			{
+				minDistScr = scr;
+			}
+			dist = qMin(dist, dist2);
+		}
+		guess = minDistScr;
+	}
+	return guess;
+}
+
+/**
+ * Helper function which will correctly find the scren widget is located on
+ */
+inline QScreen* ScreenOfWidget(QWidget* widget)
+{
+	QPoint centerOf = widget->mapToGlobal(widget->rect().center());
+	return ScreenAt(centerOf);
+}
 
 /**
  * Private data class of CDockWidget class (pimpl)
@@ -78,6 +159,7 @@ struct DockWidgetPrivate
     CDockWidget* _this = nullptr;
     QBoxLayout* Layout = nullptr;
     QWidget* Widget = nullptr;
+   CDockWidget::eInsertMode InsertMode = CDockWidget::eInsertMode::AutoScrollArea;
     CDockWidgetTab* TabWidget = nullptr;
     CDockWidget::DockWidgetFeatures Features =
         CDockWidget::DefaultDockWidgetFeatures;
@@ -100,6 +182,10 @@ struct DockWidgetPrivate
     CDockWidget::eToolBarStyleSource ToolBarStyleSource =
         CDockWidget::ToolBarStyleFromDockManager;
     QList<CDockWidget::CustomButtonData*> CustomButtons = {};
+    QShortcut* MaximizeShortcut = nullptr;
+    bool IsFullScreenMode = false;
+    QWidget* FullScreenWidget = nullptr;
+    CDockWidget::eInsertMode FullScreenInsertMode;
 
     /**
      * Private data constructor
@@ -440,11 +526,19 @@ void CDockWidget::setToggleViewActionChecked(bool Checked)
 //============================================================================
 void CDockWidget::setWidget(QWidget* widget, eInsertMode InsertMode)
 {
+    d->InsertMode = InsertMode;
     if (d->Widget)
     {
         takeWidget();
+	}
+    if (d->MaximizeShortcut)
+    {
+        delete d->MaximizeShortcut;
+        d->MaximizeShortcut = nullptr;
     }
+    d->MaximizeShortcut = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Space), this, this, &CDockWidget::onMaximizeShortcutTriggered, Qt::WidgetWithChildrenShortcut);
 
+    d->FullScreenInsertMode = InsertMode;
     auto ScrollAreaWidget = qobject_cast<QAbstractScrollArea*>(widget);
     if (ScrollAreaWidget || ForceNoScrollArea == InsertMode)
     {
@@ -508,6 +602,12 @@ QWidget* CDockWidget::takeWidget()
 QWidget* CDockWidget::widget() const
 {
     return d->Widget;
+}
+
+//============================================================================
+ads::CDockWidget::eInsertMode CDockWidget::widgetInsertMode() const
+{
+    return d->InsertMode;
 }
 
 //============================================================================
@@ -1032,6 +1132,28 @@ void CDockWidget::setToolbarFloatingStyle(bool Floating)
 }
 
 //============================================================================
+void CDockWidget::onMaximizeShortcutTriggered()
+{
+    if (!isAutoHide() && features().testFlag(CDockWidget::DockWidgetMaximizable))
+	{
+		Q_EMIT maximizeRequested();
+    }
+}
+
+//============================================================================
+void CDockWidget::showNormalInternal()
+{
+	d->FullScreenWidget->removeEventFilter(this);
+	setWidget(d->FullScreenWidget, d->FullScreenInsertMode);
+	d->FullScreenWidget->showNormal();
+	d->IsFullScreenMode = false;
+	d->FullScreenWidget = nullptr;
+	// NOTE: Added in conjunction with qwindowkit
+	setAttribute(Qt::WA_NativeWindow, false);
+	setAttribute(Qt::WA_DontCreateNativeAncestors, false);
+}
+
+//============================================================================
 void CDockWidget::emitTopLevelEventForWidget(CDockWidget* TopLevelDockWidget,
                                              bool Floating)
 {
@@ -1172,14 +1294,47 @@ bool CDockWidget::closeDockWidgetInternal(bool ForceClose)
     return true;
 }
 
+//============================================================================
 bool CDockWidget::eventFilter(QObject* watched, QEvent* event)
 {
+    if (watched == d->FullScreenWidget)
+    {
+        if (event->type() == QEvent::KeyPress || event->type() == QEvent::Close)
+        {
+            QKeyEvent* keyEvent = (QKeyEvent*)event;
+			bool keyMatches = event->type() == QEvent::KeyPress
+							  && (keyEvent->key() == Qt::Key_Escape || keyEvent->key() == Qt::Key_F11)
+							  && keyEvent->modifiers() == Qt::NoModifier;
+			bool closeReceived = event->type() == QEvent::Close;
+            if (d->IsFullScreenMode && d->FullScreenWidget && (closeReceived || keyMatches))
+            {
+                if (keyMatches)
+				{
+					event->accept();
+                }
+                if (closeReceived)
+                {
+                    event->ignore();
+                }
+                if (d->IsFullScreenMode && d->FullScreenWidget)
+                {
+                    QMetaObject::invokeMethod(this, "showNormalInternal", Qt::QueuedConnection);
+
+                }
+            }
+            return event->type() != QEvent::KeyPress;
+        }
+    }
 	if (watched == this && (event->type() == QEvent::KeyPress || event->type() == QEvent::ShortcutOverride))
 	{
 		QKeyEvent* keyEvent = (QKeyEvent*)event;
 		Qt::KeyboardModifiers mods = QApplication::queryKeyboardModifiers();
 		if (mods.testFlag(Qt::ControlModifier) && keyEvent->nativeVirtualKey() == 0x09)
 		{
+			if (dockAreaWidget()->isAreaMaximized())
+			{
+				return Super::eventFilter(watched, event);
+			}
 			if (dockAreaWidget()->openDockWidgetsCount() == 1)
 			{
 				return Super::eventFilter(watched, event);
@@ -1196,7 +1351,7 @@ bool CDockWidget::eventFilter(QObject* watched, QEvent* event)
 			}
 			else
 			{
-				return Super::eventFilter(watched, event);;
+				return Super::eventFilter(watched, event);
 			}
 			auto myFocusWidget = QApplication::focusWidget();
 			if (isAncestorOf(myFocusWidget))
@@ -1211,6 +1366,35 @@ bool CDockWidget::eventFilter(QObject* watched, QEvent* event)
 	return Super::eventFilter(watched, event);
 }
 
+//============================================================================
+void CDockWidget::keyPressEvent(QKeyEvent* event)
+{
+    if (features().testFlag(CDockWidget::DockWidgetFullScreen))
+	{
+		if (event->key() == Qt::Key_F11 && event->modifiers() == Qt::NoModifier)
+		{
+			event->accept();
+			if (!(d->IsFullScreenMode && d->FullScreenWidget))
+			{
+				QScreen* curScreen = ScreenOfWidget(this);
+				QPoint screenTopLeft = curScreen->geometry().topLeft();
+				d->FullScreenWidget = takeWidget();
+				// NOTE: Added in conjunction with qwindowkit
+				setAttribute(Qt::WA_NativeWindow, true);
+				setAttribute(Qt::WA_DontCreateNativeAncestors, true);
+				d->FullScreenWidget->setParent(nullptr);
+				d->IsFullScreenMode = true;
+				d->FullScreenWidget->installEventFilter(this);
+				d->FullScreenWidget->move(screenTopLeft);
+				d->FullScreenWidget->showFullScreen();
+			}
+			return;
+		}
+    }
+    QFrame::keyPressEvent(event);
+}
+
+//============================================================================
 bool CDockWidget::focusNextPrevChild(bool next)
 {
 	return Super::focusNextPrevChild(next);
@@ -1290,12 +1474,14 @@ bool CDockWidget::isCurrentTab() const
 
 //============================================================================
 void CDockWidget::addCustomButton(const QIcon& icon, bool initialState,
-                                  const QString& tooltip, Qt::Alignment align,
+                                  const QString& tooltip, const QString& objectName,
+                                  bool ignoreDuplicates, Qt::Alignment align,
                                   const std::function<void()>& onClicked)
 {
     CDockWidget::CustomButtonData* customButton =
         new CDockWidget::CustomButtonData;
     customButton->Text = "";
+    customButton->ObjectName = objectName;
     customButton->Icon = icon;
     customButton->InitialState = initialState ? Qt::Checked : Qt::Unchecked;
     customButton->CurrentState = customButton->InitialState;
@@ -1303,17 +1489,19 @@ void CDockWidget::addCustomButton(const QIcon& icon, bool initialState,
     customButton->Tooltip = tooltip;
     customButton->Alignment = align;
     customButton->OnClicked = onClicked;
+	customButton->IgnoreDuplicates = ignoreDuplicates;
     d->CustomButtons.push_back(customButton);
 }
 
 //============================================================================
-void CDockWidget::addCustomButton(const QIcon& icon, const QString& tooltip,
-                                  Qt::Alignment align,
+void CDockWidget::addCustomButton(const QIcon& icon, const QString& tooltip, const QString& objectName,
+                                  bool ignoreDuplicates, Qt::Alignment align,
                                   const std::function<void()>& onClicked)
 {
     CDockWidget::CustomButtonData* customButton =
         new CDockWidget::CustomButtonData;
     customButton->Text = "";
+	customButton->ObjectName = objectName;
     customButton->Icon = icon;
     customButton->InitialState = (Qt::CheckState)-1;
     customButton->CurrentState = customButton->InitialState;
@@ -1321,6 +1509,7 @@ void CDockWidget::addCustomButton(const QIcon& icon, const QString& tooltip,
     customButton->Tooltip = tooltip;
     customButton->Alignment = align;
     customButton->OnClicked = onClicked;
+    customButton->IgnoreDuplicates = ignoreDuplicates;
     d->CustomButtons.push_back(customButton);
 }
 
@@ -1358,6 +1547,12 @@ void CDockWidget::removeCustomButton(CDockWidget::CustomButtonData* bData)
 		}
 		d->CustomButtons.clear();
 	}
+}
+
+//============================================================================
+bool CDockWidget::isFlaggedAsUnassigned() const
+{
+	return d->DockArea == nullptr;
 }
 
 //============================================================================

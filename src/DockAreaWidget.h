@@ -58,6 +58,7 @@ class ADS_EXPORT CDockAreaWidget : public QFrame
 private:
     DockAreaWidgetPrivate* d;  ///< private data (pimpl)
     friend struct DockAreaWidgetPrivate;
+    friend class CMergedDockWidget;
     friend class CDockContainerWidget;
     friend class DockContainerWidgetPrivate;
     friend class CDockWidgetTab;
@@ -173,10 +174,13 @@ protected:
      */
     void updateTitleBarButtonVisibility(bool IsTopLevel) const;
 
+    bool isAreaMaximized() const; 
+
 	virtual bool focusNextPrevChild(bool next) override;
 
 protected Q_SLOTS:
     void toggleView(bool Open);
+    void onWidgetMaximizeRequested();
 
 public:
     using Super = QFrame;

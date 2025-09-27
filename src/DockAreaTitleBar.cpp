@@ -42,6 +42,7 @@
 #include <iostream>
 
 #include "AutoHideDockContainer.h"
+#include "AutoHideSideBar.h"
 #include "DockAreaTabBar.h"
 #include "DockAreaTitleBar_p.h"
 #include "DockAreaWidget.h"
@@ -55,10 +56,23 @@
 #include "FloatingDockContainer.h"
 #include "FloatingDragPreview.h"
 #include "IconProvider.h"
+#include "MergedDockWidget.h"
 #include "ads_globals.h"
 
 namespace ads
 {
+#ifndef setToolTip_QPointer_CTitleBarButton
+#define setToolTip_QPointer_CTitleBarButton
+	template ADS_EXPORT void internal::setToolTip(QPointer<CTitleBarButton> obj, const QString& tip);
+#endif
+#ifndef setToolTip_CTitleBarButton
+#define setToolTip_CTitleBarButton
+	template ADS_EXPORT void internal::setToolTip(CTitleBarButton* obj, const QString& tip);
+#endif
+#ifndef setToolTip_QAction
+#define setToolTip_QAction
+	template ADS_EXPORT void internal::setToolTip(QAction* obj, const QString& tip);
+#endif
 
 /**
  * Private data class of CDockAreaTitleBar class (pimpl)
@@ -587,6 +601,43 @@ void CDockAreaTitleBar::onAutoHideToActionClicked()
 }
 
 //============================================================================
+void CDockAreaTitleBar::mergeDockWidget()
+{
+    auto AutoHideDockContainer = d->DockArea->autoHideDockContainer();
+	auto AutoHideDockWidget = AutoHideDockContainer->dockWidget();
+	auto location = AutoHideDockContainer->sideBarLocation();
+	auto sidebar = AutoHideDockContainer->autoHideSideBar();
+	QAction* senderAct = (QAction*)QObject::sender();
+	QPair<void*, Qt::Orientation> dataAct = senderAct->data().value<QPair<void*, Qt::Orientation>>();
+	CDockWidget* dw = (CDockWidget*)dataAct.first;
+	CDockWidget* thisDw = AutoHideDockWidget;
+    int oldSize = AutoHideDockContainer->getSize();
+	CDockManager* dockMgr = thisDw->dockManager();
+	CDockAreaWidget* dockAreaWid = dockAreaWidget();
+	auto merged = new CMergedDockWidget(thisDw, dw, dataAct.second, dockAreaWid);
+
+	auto NewAutoHideDockContainer = dockMgr->addAutoHideDockWidget(location, merged);
+    dockMgr->removeDockWidget(AutoHideDockWidget);
+	dockMgr->removeDockWidget(dw);
+    AutoHideDockWidget->hide();
+    AutoHideDockWidget->flagAsUnassigned();
+	dw->hide();
+	dw->flagAsUnassigned();
+	NewAutoHideDockContainer->setSize(oldSize);
+	NewAutoHideDockContainer->collapseView(false);
+	dockMgr->restartViewMenu();
+}
+
+//============================================================================
+void CDockAreaTitleBar::splitDockWidget()
+{
+	auto AutoHideDockWidget = d->DockArea->autoHideDockContainer()->dockWidget();
+	CMergedDockWidget* thisDw = (CMergedDockWidget*)AutoHideDockWidget;
+	CDockWidget* dockWidget1, * dockWidget2;
+	thisDw->splitWidgets(dockWidget1, dockWidget2);
+}
+
+//============================================================================
 CTitleBarButton* CDockAreaTitleBar::button(TitleBarButton which) const
 {
     switch (which)
@@ -826,6 +877,46 @@ void CDockAreaTitleBar::contextMenuEvent(QContextMenuEvent* ev)
                                 SLOT(minimizeAutoHideContainer()));
         Action = Menu.addAction(tr("Close"), this,
                                 SLOT(onAutoHideCloseActionTriggered()));
+
+        auto AutoHideDockWidget = d->DockArea->autoHideDockContainer()->dockWidget();
+		if (!qobject_cast<CMergedDockWidget*>(AutoHideDockWidget) 
+            && AutoHideDockWidget->features().testFlag(CDockWidget::DockWidgetMergable))
+		{
+			Menu.addSeparator();
+			auto vmenu = Menu.addMenu(tr("Merge with vertically..."));
+			for (auto dw : d->dockManager()->dockWidgetsMap())
+			{
+				if (dw != AutoHideDockWidget && !qobject_cast<CMergedDockWidget*>(dw) 
+                    && dw->features().testFlag(CDockWidget::DockWidgetMergable))
+				{
+					Action = vmenu->addAction(dw->windowTitle(), this, SLOT(mergeDockWidget()));
+					QPair<void*, Qt::Orientation> data;
+					data.first = (void*)dw;
+					data.second = Qt::Vertical;
+					Action->setData(QVariant::fromValue(data));
+					Action->setEnabled(dw->isAutoHide() || !dw->dockContainer()->hasMaximizedWidget());
+				}
+			}
+			auto hmenu = Menu.addMenu(tr("Merge with horizontally..."));
+			for (auto dw : AutoHideDockWidget->dockManager()->dockWidgetsMap())
+			{
+				if (dw != AutoHideDockWidget && !qobject_cast<CMergedDockWidget*>(dw) 
+                    && dw->features().testFlag(CDockWidget::DockWidgetMergable))
+				{
+					Action = hmenu->addAction(dw->windowTitle(), this, SLOT(mergeDockWidget()));
+					QPair<void*, Qt::Orientation> data;
+					data.first = (void*)dw;
+					data.second = Qt::Horizontal;
+					Action->setData(QVariant::fromValue(data));
+					Action->setEnabled(dw->isAutoHide() || !dw->dockContainer()->hasMaximizedWidget());
+				}
+			}
+		}
+		else if (qobject_cast<CMergedDockWidget*>(AutoHideDockWidget))
+		{
+			Menu.addSeparator();
+			Action = Menu.addAction(tr("Split widgets"), this, SLOT(splitDockWidget()));
+		}
     }
     else
     {
@@ -859,6 +950,7 @@ void CDockAreaTitleBar::addButton(CDockWidget::CustomButtonData* data,
     newButton->setAutoFillBackground(false);
     newButton->setCheckable((int)data->InitialState != -1);
     newButton->setAutoRaise(true);
+    newButton->setObjectName(data->ObjectName);
     if ((int)data->CurrentState != -1)
     {
         newButton->setChecked(data->CurrentState == Qt::Checked ? true : false);
@@ -923,10 +1015,11 @@ void CDockAreaTitleBar::removeButton(ads::CDockWidget* source, ads::CDockWidget:
 		{
 			index = i;
 			custButton->CurrentButton = nullptr;
+            break;
 		}
 		i++;
 	}
-	auto custTitButton = custButtons[i];
+	auto custTitButton = custButtons[index];
 	custTitButton->deleteLater();
 	d->Layout->removeWidget(custTitButton);
 	index = d->CustomButtons.indexOf(custTitButton);

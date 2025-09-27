@@ -48,6 +48,10 @@
 
 namespace ads
 {
+#ifndef ads_CDockContainerWidget_findParent
+#define ads_CDockContainerWidget_findParent
+template ADS_EXPORT CDockContainerWidget* internal::findParent(const QWidget* w);
+#endif
 static const int ResizeMargin = 30;
 
 //============================================================================
@@ -183,9 +187,12 @@ CAutoHideDockContainer::CAutoHideDockContainer(CDockWidget* DockWidget,
                                                CDockContainerWidget* parent)
     : Super(parent), d(new AutoHideDockContainerPrivate(this))
 {
-    // QT_ADS: temp fix, remove it on merge
-	setWindowFlag(Qt::SubWindow, true);
     hide();  // auto hide dock container is initially always hidden
+
+    // NOTE: Added in conjunction with qwindowkit
+	setAttribute(Qt::WA_NativeWindow);
+	setAttribute(Qt::WA_DontCreateNativeAncestors);
+
     d->SideTabBarArea = area;
     d->SideTab = componentsFactory()->createDockWidgetSideTab(nullptr);
     connect(d->SideTab, &CAutoHideTab::pressed, this,

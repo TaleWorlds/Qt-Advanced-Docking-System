@@ -44,6 +44,15 @@ CIconProvider::~CIconProvider()
 }
 
 //============================================================================
+void CIconProvider::clear()
+{
+    for (qsizetype i = 0; i < d->UserIcons.size(); i++)
+	{
+        d->UserIcons[i] = QIcon();
+    }
+}
+
+//============================================================================
 QIcon CIconProvider::customIcon(eIcon IconId) const
 {
     Q_ASSERT(IconId < d->UserIcons.size());

@@ -222,7 +222,10 @@ protected:
     /**
      * Clears the dock container
      */
-    void clear();
+	void clear();
+
+	void maximizeWidget(CDockAreaWidget* area, CDockWidget* toMaximize, bool newState);
+	void minimizeCurrent();
 
 public:
     /**
@@ -314,6 +317,8 @@ public:
      * DockWidgetIndependent flag
      */
     bool hasIndependentWidget() const;
+
+    bool hasMaximizedWidget() const;
 
     bool floatingWidgetHasCustomTitleBar() const;
 

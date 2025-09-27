@@ -31,7 +31,7 @@
 #include <QAbstractButton>
 #include <QApplication>
 #include <QDebug>
-#include <QEvent>
+#include <QtGui/qevent.h>
 #include <QGridLayout>
 #include <QLabel>
 #include <QList>
@@ -58,6 +58,7 @@
 #include "DockWidgetTab.h"
 #include "DockingStateReader.h"
 #include "FloatingDockContainer.h"
+#include "MergedDockWidget.h"
 #include "ads_globals.h"
 
 #if QT_VERSION < 0x050900
@@ -90,6 +91,14 @@ QByteArray qByteArrayToHex(const QByteArray& src, char separator)
 
 namespace ads
 {
+#ifndef ads_QSplitter_findParent
+#define ads_QSplitter_findParent
+template ADS_EXPORT QSplitter* internal::findParent(const QWidget* w);
+#endif
+#ifndef ads_CFloatingDockContainer_findParent
+#define ads_CFloatingDockContainer_findParent
+template ADS_EXPORT CFloatingDockContainer* internal::findParent(const QWidget* w);
+#endif
 
 enum eDropMode
 {
@@ -152,6 +161,8 @@ public:
     CDockAreaWidget* TopLevelDockArea = nullptr;
     QTimer DelayedAutoHideTimer;
     CAutoHideTab* DelayedAutoHideTab;
+	CDockAreaWidget* MaximizedDockArea = nullptr;
+	QList<bool> MaximizedDockAreaStates;
     bool DelayedAutoHideShow = false;
 
     /**
@@ -354,6 +365,7 @@ public:
         s->setOpaqueResize(
             CDockManager::testConfigFlag(CDockManager::OpaqueSplitterResize));
         s->setChildrenCollapsible(false);
+		s->setProperty("ads-splitter", QVariant(true));
         return s;
     }
 
@@ -1192,11 +1204,12 @@ bool DockContainerWidgetPrivate::restoreSideBar(CDockingStateReader& s,
 
     while (s.readNextStartElement())
     {
-        if (s.name() != QLatin1String("Widget"))
+		if (s.name() != QLatin1String("Widget") && s.name() != QLatin1String("MergedWidget"))
         {
             continue;
         }
-
+        if (s.name() == QLatin1String("Widget"))
+		{
         auto Name = s.attributes().value("Name");
         if (Name.isEmpty())
         {
@@ -1244,7 +1257,107 @@ bool DockContainerWidgetPrivate::restoreSideBar(CDockingStateReader& s,
         AutoHideContainer->collapseView(true);
         DockWidget->setProperty(internal::DirtyProperty, false);
     }
+        else
+		{
+			auto ObjectName = s.attributes().value("Name");
+			if (ObjectName.isEmpty())
+			{
+				return false;
+			}
 
+			bool Closed = s.attributes().value("Closed").toInt(&Ok);
+			if (!Ok)
+			{
+				return false;
+			}
+            
+            int Size = s.attributes().value("Size").toInt(&Ok);
+			if (!Ok)
+			{
+				return false;
+			}
+
+			s.skipCurrentElement();
+
+			QString widget1ObjName, widget2ObjName;
+            QList<int> SplitterSizes;
+			int Count;
+			Qt::Orientation orient = Qt::Vertical;
+			// Splitter
+			s.readNextStartElement();
+			{
+				auto orientStr = s.attributes().value("Orientation").toString();
+				if (orientStr != "|" || orientStr != "-")
+				{
+					return false;
+				}
+                bool HorizontalSplitter = orientStr == "|";
+				orient = HorizontalSplitter ? Qt::Horizontal : Qt::Vertical;
+
+				Count = s.attributes().value("Count").toInt(&Ok);
+				if (!Ok || Count != 2)
+				{
+					return false;
+				}
+				// Widget 1
+				s.readNextStartElement();
+				{
+					widget1ObjName = s.attributes().value("Name").toString();
+					if (widget1ObjName.isEmpty())
+					{
+						return false;
+					}
+					s.skipCurrentElement();
+				}
+				// Widget 2
+				s.readNextStartElement();
+				{
+					widget2ObjName = s.attributes().value("Name").toString();
+					if (widget2ObjName.isEmpty())
+					{
+						return false;
+					}
+					s.skipCurrentElement();
+				}
+				// Sizes
+				s.readNextStartElement();
+				{
+					QString sSizes = s.readElementText().trimmed();
+					QTextStream TextStream(&sSizes);
+					while (!TextStream.atEnd())
+					{
+						int value;
+						TextStream >> value;
+						SplitterSizes.append(value);
+					}
+				}
+				s.skipCurrentElement();
+			}
+			s.skipCurrentElement();
+
+			Q_EMIT DockManager->aboutToRestoreDockWidget(widget1ObjName, Testing);
+			Q_EMIT DockManager->aboutToRestoreDockWidget(widget2ObjName, Testing);
+			CDockWidget* DockWidget1 = DockManager->findDockWidget(widget1ObjName);
+			CDockWidget* DockWidget2 = DockManager->findDockWidget(widget2ObjName);
+			if (!DockWidget1 || !DockWidget2 || Testing)
+			{
+				continue;
+			}
+			auto SideBar = _this->autoHideSideBar(Area);
+            auto merged = new CMergedDockWidget(DockWidget1, DockWidget2, orient, DockManager);
+			auto NewAutoHideDockContainer = DockManager->addAutoHideDockWidget(Area, merged);
+            NewAutoHideDockContainer->setSize(Size);
+            merged->setProperty(internal::ClosedProperty, Closed);
+            NewAutoHideDockContainer->collapseView(true);
+			merged->setProperty(internal::DirtyProperty, false);
+			DockManager->removeDockWidget(DockWidget1);
+			DockManager->removeDockWidget(DockWidget2);
+            DockWidget1->hide();
+			DockWidget1->flagAsUnassigned();
+			DockWidget2->hide();
+			DockWidget2->flagAsUnassigned();
+        }        
+    }
     return true;
 }
 
@@ -1441,9 +1554,9 @@ CDockAreaWidget* DockContainerWidgetPrivate::addDockWidgetToDockArea(
         updateSplitterHandles(NewSplitter);
         TargetAreaSplitter->insertWidget(index, NewSplitter);
         updateSplitterHandles(TargetAreaSplitter);
+		TargetAreaSplitter->setSizes(TargetAreaSizes);
         if (CDockManager::testConfigFlag(CDockManager::EqualSplitOnInsertion))
         {
-            TargetAreaSplitter->setSizes(TargetAreaSizes);
             adjustSplitterSizesOnInsertion(NewSplitter);
         }
     }
@@ -1720,13 +1833,15 @@ void CDockContainerWidget::removeDockArea(CDockAreaWidget* area)
     {
         ADS_PRINT("Replacing splitter with content");
         QSplitter* ParentSplitter = internal::findParent<QSplitter*>(Splitter);
+        if (ParentSplitter)
+		{
         auto Sizes = ParentSplitter->sizes();
         QWidget* widget = Splitter->widget(0);
         widget->setParent(this);
         internal::replaceSplitterWidget(ParentSplitter, Splitter, widget);
         ParentSplitter->setSizes(Sizes);
     }
-
+    }
     delete Splitter;
     Splitter = nullptr;
 
@@ -1966,6 +2081,18 @@ bool CDockContainerWidget::hasOpenDockAreas() const
 void CDockContainerWidget::saveState(QXmlStreamWriter& s) const
 {
     ADS_PRINT("CDockContainerWidget::saveState isFloating " << isFloating());
+    auto cpyStates = d->MaximizedDockAreaStates;
+    auto cpyArea = d->MaximizedDockArea;
+    if (d->MaximizedDockArea && !d->MaximizedDockAreaStates.isEmpty())
+    {
+        auto this_ = (CDockContainerWidget*)this;
+		this_->maximizeWidget(d->MaximizedDockArea, d->MaximizedDockArea->currentDockWidget(), false);
+		QApplication::instance()->sendPostedEvents(nullptr, QEvent::Hide);
+		QApplication::instance()->sendPostedEvents(nullptr, QEvent::ShowToParent);
+		QApplication::instance()->sendPostedEvents(nullptr, QEvent::Show);
+		QApplication::instance()->sendPostedEvents(nullptr, QEvent::UpdateLater);
+		QApplication::instance()->sendPostedEvents(nullptr, QEvent::LayoutRequest);
+    }
 
     s.writeStartElement("Container");
     s.writeAttribute("Independent",
@@ -1983,7 +2110,12 @@ void CDockContainerWidget::saveState(QXmlStreamWriter& s) const
     }
     d->saveChildNodesState(s, d->RootSplitter);
     d->saveAutoHideWidgetsState(s);
-    s.writeEndElement();
+	s.writeEndElement();
+    if (cpyArea && !cpyStates.isEmpty())
+	{
+		auto this_ = (CDockContainerWidget*)this;
+		this_->maximizeWidget(cpyArea, cpyArea->currentDockWidget(), true);
+	}
 }
 
 //============================================================================
@@ -1991,7 +2123,6 @@ bool CDockContainerWidget::restoreState(CDockingStateReader& s, bool Testing)
 {
     bool IsFloating = s.attributes().value("Floating").toInt();
     ADS_PRINT("Restore CDockContainerWidget Floating" << IsFloating);
-
     QWidget* NewRootSplitter{};
     if (!Testing)
     {
@@ -2150,21 +2281,16 @@ bool CDockContainerWidget::hasIndependentWidget() const
     return (bool)d->IndependentDWCount;
 }
 
+//============================================================================
+bool CDockContainerWidget::hasMaximizedWidget() const
+{
+    return !d->MaximizedDockAreaStates.empty();
+}
+
 bool CDockContainerWidget::floatingWidgetHasCustomTitleBar() const
 {
-    if (!isFloating())
-    {
         return false;
     }
-    else if (floatingWidget() && !floatingWidget()->hasNativeTitleBar())
-    {
-        return true;
-    }
-    else
-    {
-        return false;
-    }
-}
 
 //============================================================================
 CDockWidget* CDockContainerWidget::topLevelDockWidget() const
@@ -2265,6 +2391,86 @@ void CDockContainerWidget::clear()
     std::fill(std::begin(d->LastAddedAreaCache), std::end(d->LastAddedAreaCache),
               nullptr);
     d->TopLevelDockArea = nullptr;
+}
+
+//============================================================================
+void CDockContainerWidget::maximizeWidget(CDockAreaWidget* area, CDockWidget* toMaximize, bool newState)
+{
+	setUpdatesEnabled(false);
+    auto visitSplitters = [this](QSplitter* splitter, CDockAreaWidget* area, bool visiblity, auto&& func) -> void
+    {
+        for (int i = 0; i < splitter->count(); i++)
+        {
+			QSplitter* childSplitter = qobject_cast<QSplitter*>(splitter->widget(i));
+            if (childSplitter)
+			{
+                QWidget* w = area;
+                bool splitterContainsArea = false;
+                while (w)
+				{
+					if (w == childSplitter)
+					{
+                        splitterContainsArea = true;
+                        break;
+					}
+                    w = w->parentWidget();
+                }
+                if (!splitterContainsArea)
+				{
+					childSplitter->setVisible(visiblity);
+                }
+				func(childSplitter, area, visiblity, func);
+            }
+        }
+    };
+    if (newState)
+	{
+		d->MaximizedDockArea = area;
+		area->titleBar()->hide();
+        d->MaximizedDockAreaStates.clear();
+        for (auto Area : d->DockAreas)
+		{
+            d->MaximizedDockAreaStates.push_back(Area->isVisible());
+        }
+        for (auto Area : d->DockAreas)
+        {
+            if (Area != area)
+			{
+                Area->blockSignals(true);
+				Area->hide();
+				Area->blockSignals(false);
+            }
+        }
+        visitSplitters(d->RootSplitter, area, false, visitSplitters);
+    }
+    else
+	{
+		area->updateTitleBarVisibility();
+        for (int i = 0; i < (int)d->DockAreas.size(); i++)
+        {
+            auto Area = d->DockAreas[i];
+            if (Area != area)
+			{
+				Area->blockSignals(true);
+				Area->setVisible(d->MaximizedDockAreaStates[i]);
+				Area->blockSignals(false);
+            }
+		}
+		visitSplitters(d->RootSplitter, area, true, visitSplitters);
+		d->MaximizedDockAreaStates.clear();
+		d->MaximizedDockArea = nullptr;
+	}
+	setUpdatesEnabled(true);
+    Q_EMIT d->DockManager->maximizeFinished(area, toMaximize);
+}
+
+//============================================================================
+void CDockContainerWidget::minimizeCurrent()
+{
+    if (hasMaximizedWidget())
+	{
+		maximizeWidget(d->MaximizedDockArea, d->MaximizedDockArea->currentDockWidget(), false);
+    }
 }
 
 //============================================================================

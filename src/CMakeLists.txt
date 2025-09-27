@@ -29,8 +29,8 @@ set(ads_SRCS
     DockFocusController.cpp
     ElidingLabel.cpp
     FloatingDockContainer.cpp
-    FloatingWidgetTitleBar.cpp
     FloatingDragPreview.cpp
+	MergedDockWidget.cpp
     IconProvider.cpp
     DockComponentsFactory.cpp
     AutoHideSideBar.cpp
@@ -56,9 +56,9 @@ set(ads_HEADERS
     DockFocusController.h
     ElidingLabel.h
     FloatingDockContainer.h
-    FloatingWidgetTitleBar.h
     FloatingDragPreview.h
     IconProvider.h
+	MergedDockWidget.h
     DockComponentsFactory.h
     AutoHideSideBar.h
     AutoHideTab.h

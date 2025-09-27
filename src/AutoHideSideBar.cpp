@@ -34,6 +34,7 @@
 #include <QScrollBar>
 #include <QStyleOption>
 #include <QXmlStreamWriter>
+#include <QtGui/QEvent.h>
 
 #include "AutoHideDockContainer.h"
 #include "AutoHideTab.h"

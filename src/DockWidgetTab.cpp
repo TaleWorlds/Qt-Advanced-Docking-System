@@ -50,10 +50,20 @@
 #include "FloatingDockContainer.h"
 #include "FloatingDragPreview.h"
 #include "IconProvider.h"
+#include "MergedDockWidget.h"
 #include "ads_globals.h"
 
 namespace ads
 {
+#ifndef setToolTip_QLabel
+#define setToolTip_QLabel
+template ADS_EXPORT void internal::setToolTip(QLabel* obj, const QString& tip);
+#endif
+
+#ifndef setToolTip_QAbstractButton
+#define setToolTip_QAbstractButton
+template ADS_EXPORT void internal::setToolTip(QAbstractButton* obj, const QString& tip);
+#endif
 
 using tTabLabel = CElidingLabel;
 
@@ -579,7 +589,47 @@ void CDockWidgetTab::contextMenuEvent(QContextMenuEvent* ev)
             d->createAutoHideToAction(tr("Right"), SideBarRight, menu);
             d->createAutoHideToAction(tr("Bottom"), SideBarBottom, menu);
         }
-    }
+	}
+	if (!qobject_cast<CMergedDockWidget*>(d->DockWidget)
+		&& d->DockWidget->features().testFlag(CDockWidget::DockWidgetMergable))
+	{
+		Menu.addSeparator();
+		auto vmenu = Menu.addMenu(tr("Merge with vertically..."));
+        for (auto dw : d->DockWidget->dockManager()->dockWidgetsMap())
+		{
+			if (dw != d->DockWidget && !qobject_cast<CMergedDockWidget*>(dw)
+                && dw->features().testFlag(CDockWidget::DockWidgetMergable))
+			{
+				Action = vmenu->addAction(dw->windowTitle(), this, SLOT(mergeDockWidget()));
+                QPair<void*, Qt::Orientation> data;
+				data.first = (void*)dw;
+				data.second = Qt::Vertical;
+				Action->setData(QVariant::fromValue(data));
+				Action->setEnabled((dw->isAutoHide() || !dw->dockContainer()->hasMaximizedWidget()) 
+                    && (d->DockWidget->isAutoHide() || !d->DockWidget->dockContainer()->hasMaximizedWidget()));
+			}
+		}
+		auto hmenu = Menu.addMenu(tr("Merge with horizontally..."));
+		for (auto dw : d->DockWidget->dockManager()->dockWidgetsMap())
+		{
+			if (dw != d->DockWidget && !qobject_cast<CMergedDockWidget*>(dw)
+                && dw->features().testFlag(CDockWidget::DockWidgetMergable))
+			{
+				Action = hmenu->addAction(dw->windowTitle(), this, SLOT(mergeDockWidget()));
+				QPair<void*, Qt::Orientation> data;
+				data.first = (void*)dw;
+				data.second = Qt::Horizontal;
+				Action->setData(QVariant::fromValue(data));
+				Action->setEnabled((dw->isAutoHide() || !dw->dockContainer()->hasMaximizedWidget())
+					&& (d->DockWidget->isAutoHide() || !d->DockWidget->dockContainer()->hasMaximizedWidget()));
+			}
+		}
+	}
+    else if (qobject_cast<CMergedDockWidget*>(d->DockWidget))
+	{
+		Menu.addSeparator();
+		Action = Menu.addAction(tr("Split widgets"), this, SLOT(splitDockWidget()));
+	}
 
     Menu.addSeparator();
     Action = Menu.addAction(tr("Close"), this, SIGNAL(closeRequested()));
@@ -800,6 +850,34 @@ void CDockWidgetTab::onAutoHideToActionClicked()
 }
 
 //============================================================================
+void CDockWidgetTab::mergeDockWidget()
+{
+    QAction* senderAct = (QAction*)QObject::sender();
+    QPair<void*, Qt::Orientation> dataAct = senderAct->data().value<QPair<void*, Qt::Orientation>>();
+    CDockWidget* dw = (CDockWidget*)dataAct.first;
+	CDockWidget* thisDw = dockWidget();
+	CDockManager* dockMgr = thisDw->dockManager();
+    CDockAreaWidget* dockAreaWid = dockAreaWidget();
+    auto merged = new CMergedDockWidget(thisDw, dw, dataAct.second, dockAreaWid);
+    dockMgr->addDockWidget(ads::CenterDockWidgetArea, merged, dockAreaWid);
+	dockMgr->removeDockWidget(thisDw);
+	dockMgr->removeDockWidget(dw);
+	thisDw->hide();
+	thisDw->flagAsUnassigned();
+	dw->hide();
+	dw->flagAsUnassigned();
+	dockMgr->restartViewMenu();
+}
+
+//============================================================================
+void CDockWidgetTab::splitDockWidget()
+{
+	CMergedDockWidget* thisDw = (CMergedDockWidget*)dockWidget();
+    CDockWidget* dockWidget1, *dockWidget2;
+    thisDw->splitWidgets(dockWidget1, dockWidget2);
+}
+
+//============================================================================
 bool CDockWidgetTab::event(QEvent* e)
 {
 #ifndef QT_NO_TOOLTIP
@@ -836,7 +914,15 @@ void CDockWidgetTab::setElideMode(Qt::TextElideMode mode)
 //============================================================================
 void CDockWidgetTab::updateStyle()
 {
-    internal::repolishStyle(this, internal::RepolishDirectChildren);
+    if (property("focused").toBool())
+    {
+        d->TitleLabel->setForegroundRole(QPalette::HighlightedText);
+    }
+    else
+	{
+		d->TitleLabel->setForegroundRole(QPalette::WindowText);
+}
+    d->TitleLabel->update();
 }
 
 //============================================================================

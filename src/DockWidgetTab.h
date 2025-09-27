@@ -63,7 +63,9 @@ private:
 private Q_SLOTS:
     void detachDockWidget();
     void autoHideDockWidget();
-    void onAutoHideToActionClicked();
+	void onAutoHideToActionClicked();
+	void mergeDockWidget();
+    void splitDockWidget();
 
 protected:
     virtual void mousePressEvent(QMouseEvent* ev) override;

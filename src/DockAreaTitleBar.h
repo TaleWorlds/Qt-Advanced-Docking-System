@@ -123,7 +123,9 @@ private Q_SLOTS:
     void onCurrentTabChanged(int Index);
     void onAutoHideButtonClicked();
     void onAutoHideDockAreaActionClicked();
-    void onAutoHideToActionClicked();
+	void onAutoHideToActionClicked();
+	void mergeDockWidget();
+	void splitDockWidget();
 
 protected:
     /**

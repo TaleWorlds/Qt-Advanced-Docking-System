@@ -55,9 +55,33 @@
 #include "DockingStateReader.h"
 #include "ElidingLabel.h"
 #include "FloatingDockContainer.h"
+#include "MergedDockWidget.h"
 
 namespace ads
 {
+#ifndef setFlag_ads_CDockAreaWidget_DockAreaFlags
+#define setFlag_ads_CDockAreaWidget_DockAreaFlags
+template ADS_EXPORT void internal::setFlag(ads::CDockAreaWidget::DockAreaFlags& Flags,
+												typename ads::CDockAreaWidget::DockAreaFlags::enum_type flag,
+												bool on);
+#endif
+
+#ifndef ads_CDockContainerWidget_findParent
+#define ads_CDockContainerWidget_findParent
+template ADS_EXPORT CDockContainerWidget* internal::findParent(const QWidget* w);
+#endif
+
+#ifndef ads_CDockSplitter_findParent
+#define ads_CDockSplitter_findParent
+template ADS_EXPORT CDockSplitter* internal::findParent(const QWidget* w);
+#endif
+
+
+#ifndef setToolTip_QAbstractButton
+#define setToolTip_QAbstractButton
+template ADS_EXPORT void internal::setToolTip(QAbstractButton* obj, const QString& tip);
+#endif
+
 static const char* const INDEX_PROPERTY = "index";
 static const char* const ACTION_PROPERTY = "action";
 
@@ -238,6 +262,7 @@ struct DockAreaWidgetPrivate
     CDockManager* DockManager = nullptr;
     CAutoHideDockContainer* AutoHideDockContainer = nullptr;
     bool UpdateTitleBarButtons = false;
+    bool AreaMaximized = false;
     unsigned int IndependentDWCount = 0;
     DockWidgetAreas AllowedAreas = DefaultAllowedAreas;
     QSize MinSizeHint;
@@ -521,20 +546,21 @@ void CDockAreaWidget::setAutoHideDockContainer(
 void CDockAreaWidget::addDockWidget(CDockWidget* DockWidget)
 {
     insertDockWidget(d->ContentsLayout->count(), DockWidget);
-    if (DockWidget->features().testFlag(CDockWidget::DockWidgetIndependent))
-    {
-        d->IndependentDWCount++;
     }
-}
 
 //============================================================================
 void CDockAreaWidget::insertDockWidget(int index, CDockWidget* DockWidget,
                                        bool Activate)
 {
+	if (DockWidget->features().testFlag(CDockWidget::DockWidgetIndependent))
+	{
+		d->IndependentDWCount++;
+	}
     if (index < 0 || index > d->ContentsLayout->count())
     {
         index = d->ContentsLayout->count();
     }
+    QObject::connect(DockWidget, &CDockWidget::maximizeRequested, this, &CDockAreaWidget::onWidgetMaximizeRequested);
     d->ContentsLayout->insertWidget(index, DockWidget);
     DockWidget->setDockArea(this);
     DockWidget->tabWidget()->setDockAreaWidget(this);
@@ -583,6 +609,11 @@ void CDockAreaWidget::removeDockWidget(CDockWidget* DockWidget)
     {
         return;
     }
+	QObject::disconnect(DockWidget, &CDockWidget::maximizeRequested, this, &CDockAreaWidget::onWidgetMaximizeRequested);
+	if (DockWidget->features().testFlag(CDockWidget::DockWidgetIndependent))
+	{
+		d->IndependentDWCount--;
+	}
 
     // If this dock area is in a auto hide container, then we can delete
     // the auto hide container now
@@ -900,7 +931,29 @@ void CDockAreaWidget::updateTitleBarVisibility()
                                                   openedDockWidgets().at(0);
         Hidden &= !IsAutoHide;  // Titlebar must always be visible when auto
                                 // hidden so it can be dragged
+
+		// Titlebar must always be visible when 
+		// the user have added their custom buttons to the title bar
+		Hidden &= !d->TitleBar->hasCustomButtons();
+
+		// Titlebar must always be visible when 
+		// the user have merged dock widgets together in that dock area
+        bool HasMerged = false;
+        for (auto openDockWidget : openedDockWidgets())
+        {
+            if (qobject_cast<CMergedDockWidget*>(openDockWidget))
+			{
+                HasMerged = true;
+                break;
+            }
+        }
+        Hidden &= !HasMerged;
+
         d->TitleBar->setVisible(!Hidden);
+    }
+    else
+	{
+		d->TitleBar->show();
     }
 
     if (isAutoHideFeatureEnabled())
@@ -935,6 +988,12 @@ void CDockAreaWidget::updateAutoHideButtonCheckState()
 void CDockAreaWidget::updateTitleBarButtonVisibility(bool IsTopLevel) const
 {
     d->updateTitleBarButtonVisibility(IsTopLevel);
+}
+
+//============================================================================
+bool CDockAreaWidget::isAreaMaximized() const
+{
+    return d->AreaMaximized;
 }
 
 bool CDockAreaWidget::focusNextPrevChild(bool next)
@@ -1020,11 +1079,12 @@ bool CDockAreaWidget::restoreState(CDockingStateReader& s,
 
     while (s.readNextStartElement())
     {
-        if (s.name() != QLatin1String("Widget"))
+        if (s.name() != QLatin1String("Widget") && s.name() != QLatin1String("MergedWidget"))
         {
             continue;
         }
-
+        if (s.name() == QLatin1String("Widget"))
+		{
         auto ObjectName = s.attributes().value("Name");
         if (ObjectName.isEmpty())
         {
@@ -1062,7 +1122,105 @@ bool CDockAreaWidget::restoreState(CDockingStateReader& s,
         DockWidget->setProperty(internal::ClosedProperty, Closed);
         DockWidget->setProperty(internal::DirtyProperty, false);
     }
+        else
+        {
+			auto ObjectName = s.attributes().value("Name");
+			if (ObjectName.isEmpty())
+			{
+				return false;
+			}
 
+			bool Closed = s.attributes().value("Closed").toInt(&Ok);
+			if (!Ok)
+			{
+				return false;
+			}
+
+			QString widget1ObjName, widget2ObjName;
+            QList<int> SplitterSizes;
+            int Count;
+			Qt::Orientation orient = Qt::Vertical;
+            // Splitter
+            s.readNextStartElement();
+			{
+				auto orientStr = s.attributes().value("Orientation").toString();
+				if (orientStr != "|" && orientStr != "-")
+				{
+					return false;
+				}
+				bool HorizontalSplitter = orientStr == "|";
+				orient = HorizontalSplitter ? Qt::Horizontal : Qt::Vertical;
+
+                Count = s.attributes().value("Count").toInt(&Ok);
+				if (!Ok || Count != 2)
+				{
+					return false;
+				}
+				// Widget 1
+				s.readNextStartElement();
+				{
+					widget1ObjName = s.attributes().value("Name").toString();
+					if (widget1ObjName.isEmpty())
+					{
+						return false;
+					}
+					s.skipCurrentElement();
+				}
+				// Widget 2
+				s.readNextStartElement();
+				{
+                    widget2ObjName = s.attributes().value("Name").toString();
+					if (widget2ObjName.isEmpty())
+					{
+						return false;
+					}
+					s.skipCurrentElement();
+				}
+				// Sizes
+				s.readNextStartElement();
+				{
+					QString sSizes = s.readElementText().trimmed();
+					QTextStream TextStream(&sSizes);
+					while (!TextStream.atEnd())
+					{
+						int value;
+						TextStream >> value;
+                        SplitterSizes.append(value);
+					}
+				}
+				s.skipCurrentElement();
+            }
+			s.skipCurrentElement();
+
+			Q_EMIT DockManager->aboutToRestoreDockWidget(widget1ObjName, Testing);
+			Q_EMIT DockManager->aboutToRestoreDockWidget(widget2ObjName, Testing);
+			CDockWidget* DockWidget1 = DockManager->findDockWidget(widget1ObjName);
+			CDockWidget* DockWidget2 = DockManager->findDockWidget(widget2ObjName);
+			if (!DockWidget1 || !DockWidget2 || Testing)
+			{
+				continue;
+			}
+
+			ADS_PRINT("Dock Widget1 found - parent " << DockWidget1->parent());
+			ADS_PRINT("Dock Widget2 found - parent " << DockWidget2->parent());
+
+			// We hide the DockArea here to prevent the short display (the flashing)
+			// of the dock areas during application startup
+			DockArea->hide();
+            CMergedDockWidget* mergedDW = new CMergedDockWidget(DockWidget1, DockWidget2, orient, DockArea);
+            DockArea->dockManager()->addDockWidget(ads::CenterDockWidgetArea, mergedDW, DockArea);
+            mergedDW->setToggleViewActionChecked(!Closed);
+            mergedDW->setClosedState(Closed);
+            mergedDW->setProperty(internal::ClosedProperty, Closed);
+			mergedDW->setProperty(internal::DirtyProperty, false);
+            DockArea->dockManager()->removeDockWidget(DockWidget1);
+            DockArea->dockManager()->removeDockWidget(DockWidget2);
+            DockWidget1->hide();
+            DockWidget1->flagAsUnassigned();
+            DockWidget2->hide();
+            DockWidget2->flagAsUnassigned();
+        }
+    }
     if (Testing)
     {
         return true;
@@ -1172,6 +1330,16 @@ void CDockAreaWidget::toggleView(bool Open)
     setVisible(Open);
 
     Q_EMIT viewToggled(Open);
+}
+
+//============================================================================
+void CDockAreaWidget::onWidgetMaximizeRequested()
+{
+    CDockWidget* senderWid = qobject_cast<CDockWidget*>(QObject::sender());
+    Q_ASSERT(senderWid == currentDockWidget());
+    d->AreaMaximized = !d->AreaMaximized;
+    auto Container = dockContainer();
+    Container->maximizeWidget(this, senderWid, d->AreaMaximized);
 }
 
 //============================================================================

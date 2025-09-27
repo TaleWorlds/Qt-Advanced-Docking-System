@@ -53,6 +53,7 @@ class CDockComponentsFactory;
 class CDockFocusController;
 class CAutoHideSideBar;
 class CAutoHideTab;
+class CMergedDockWidget;
 struct AutoHideTabPrivate;
 
 /**
@@ -72,14 +73,16 @@ class ADS_EXPORT CDockManager : public CDockContainerWidget
     Q_OBJECT
 private:
     DockManagerPrivate* d;  ///< private data (pimpl)
+	friend class PaletteEventFilter;
+	friend class WindowActivateEventFilter;
     friend struct DockManagerPrivate;
     friend class CFloatingDockContainer;
     friend struct FloatingDockContainerPrivate;
     friend class CDockContainerWidget;
     friend class DockContainerWidgetPrivate;
     friend class CDockAreaTabBar;
-    friend class CDockWidgetTab;
-    friend struct DockAreaWidgetPrivate;
+	friend class CDockWidgetTab;
+	friend struct DockAreaWidgetPrivate;
     friend struct DockWidgetTabPrivate;
     friend class CFloatingDragPreview;
     friend struct FloatingDragPreviewPrivate;
@@ -89,7 +92,6 @@ private:
     friend CAutoHideTab;
     friend AutoHideTabPrivate;
 private Q_SLOTS:
-	void onApplicationStateChanged(Qt::ApplicationState newState);
 	void onMainWindowActivated();
 public Q_SLOTS:
     /**
@@ -233,30 +235,11 @@ public:
 		FocusHighlighting = 0x200000,	  //!< enables styling of focused dock widget tabs or floating widget titlebar
 		EqualSplitOnInsertion = 0x400000, ///!< if enabled, the space is equally distributed to all widgets in a  splitter
 
-		FloatingContainerForceNativeTitleBar =
-			0x800000, //!< Forces all FloatingContainer to use the native title bar. This might break docking for
-		//!< FloatinContainer on some Window Managers (like Kwin/KDE). If neither this nor
-		//!< FloatingContainerForceCustomTitleBar is set (the default) native titlebars are used except on known
-		//!< bad systems.
-		//! Users can overwrite this by setting the environment variable ADS_UseNativeTitle to "1" or "0".
-
-		FloatingContainerForceQWidgetTitleBar = 0x4000000, //!< Forces all FloatingContainer to use a QWidget based title bar.
-		//!< If neither this nor FloatingContainerForceNativeTitleBar is set (the default) native titlebars
-		//!< are used except on known bad systems.
-		//! Users can overwrite this by setting the environment variable ADS_UseNativeTitle to "1" or "0".
-
-		FloatingContainerForceQWidgetCustomStyledTitleBar =
-			0x1000000, //!< This flag does the same functionality as FloatingContainerForceQWidgetTitleBar, and it
-		//!< allows the users to set their own styling if they are using QWidgetTitleBar using Stylesheets. If
-		//!< this flag is set, but the styling was not provided, Icons and buttons might not be seen. Currently,
-		// qroperty-maximizeIcon: ..; syntax does not seem to work
-
 		MiddleMouseButtonClosesTab =
 			0x2000000, //! If the flag is set, the user can use the mouse middle button to close the tab under the mouse
 		DoubleClickDoesNotFloatTab =
 			0x8000000, //! If the flag is set, the user will not be able to float a tab by double clicking on it
 		DisableTabTextEliding = 0x10000000,
-		FloatingShadowEnabled = 0x20000000,		  //! Shadow for floating dock container
 		ShowTabTextOnlyForActiveTab = 0x40000000, //! Set this flag to show label texts in dock area tabs only for active tabs
 		UseProxyStyle = 0x80000000,				  //! Set this flag to use proxy styling instead of stylesheet styling
         DefaultDockAreaButtons = DockAreaHasCloseButton | DockAreaHasUndockButton
@@ -402,6 +385,8 @@ public:
      */
     static CIconProvider& iconProvider();
 
+    static int stateFileVersion();
+
     /**
      * Adds dockwidget into the given area.
      * If DockAreaWidget is not null, then the area parameter indicates the area
@@ -481,7 +466,17 @@ public:
     /**
      * Remove the given Dock from the dock manager
      */
-    void removeDockWidget(CDockWidget* Dockwidget);
+	void removeDockWidget(CDockWidget* Dockwidget);
+
+    /**
+    * Convenience function for splitting merged widgets
+    */
+	void splitMergedWidgets();
+
+    /**
+    * Convenience function for minimizing maximized dock widgets
+    */
+    void minimizeDockWidgets();
 
     /**
      * This function returns a readable reference to the internal dock
@@ -498,7 +493,14 @@ public:
     /**
      * Returns the list of all floating widgets
      */
-    const QList<CFloatingDockContainer*> floatingWidgets() const;
+	const QList<CFloatingDockContainer*> floatingWidgets() const;
+
+    /**
+     * Returns the list of all merged dock widgets
+     */
+	const QList<CMergedDockWidget*> mergedWidgets() const;
+
+
 
     /**
      * This function always return 0 because the main window is always behind
@@ -546,7 +548,7 @@ public:
      * If a perspective with the given name already exists, then
      * it will be overwritten with the new state.
      */
-    void addPerspective(const QString& UniquePrespectiveName);
+    void addPerspective(const QString& UniquePrespectiveName, int userLayoutVersion);
 
 	void addPerspective(const QString& UniquePrespectiveName,
                         const QByteArray& PerspectiveData);
@@ -642,6 +644,15 @@ public:
      * submenus created inside it and deletes and recreates the view menu
      */
     void resetViewMenu();
+
+    /**
+     * This function clears internal view menu, also deleting the
+     * submenus created inside it and but does not delete and recreate the menu itself.
+     * It then emits a signal to the user so that the user can fill the menu 
+     * manually when necessary
+     */
+    void restartViewMenu();
+
     /**
      * Define the insertion order for toggle view menu items.
      * The order defines how the actions are added to the view menu.
@@ -677,8 +688,7 @@ public:
      * Helper function to set focus depending on the configuration of the
      * FocusStyling flag
      */
-    template<class QWidgetPtr>
-    static void setWidgetFocus(QWidgetPtr widget)
+    static void setWidgetFocus(QWidget* widget)
     {
         if (!CDockManager::testConfigFlag(CDockManager::FocusHighlighting))
         {
@@ -802,7 +812,7 @@ public Q_SLOTS:
     /**
      * Opens the perspective with the given name.
      */
-    void openPerspective(const QString& PerspectiveName);
+    void openPerspective(const QString& PerspectiveName, int userVersion);
 
     /**
      * Request a focus change to the given dock widget.
@@ -866,6 +876,7 @@ Q_SIGNALS:
      */
     void perspectiveOpened(const QString& PerspectiveName);
 
+	void creatingFloatingDockContainer(ads::CFloatingDockContainer* FloatingWidget);
     /**
      * This signal is emitted, if a new floating widget has been created.
      * An application can use this signal to e.g. subscribe to events of
@@ -908,6 +919,15 @@ Q_SIGNALS:
     void focusedDockWidgetChanged(ads::CDockWidget* old, ads::CDockWidget* now);
 
 	void aboutToRestoreDockWidget(const QString& objectName, bool testing);
+
+    /**
+    * This signal is emitted when the view menu is cleared in place (restarted, not reset)
+    * , to signal the application that
+    * the view menu needs to be reinitialized
+    */
+    void viewMenuReset();
+
+    void maximizeFinished(CDockAreaWidget* daw, CDockWidget* dw);
 
 };  // class DockManager
 }  // namespace ads

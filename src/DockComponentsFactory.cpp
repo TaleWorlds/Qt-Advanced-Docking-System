@@ -70,6 +70,12 @@ void CDockComponentsFactory::resetDefaultFactory()
 {
     DefaultFactory.reset(new CDockComponentsFactory());
 }
+
+const ads::CDockComponentsFactory* componentsFactory()
+{
+	return CDockComponentsFactory::factory();
+}
+
 }  // namespace ads
 
 //---------------------------------------------------------------------------

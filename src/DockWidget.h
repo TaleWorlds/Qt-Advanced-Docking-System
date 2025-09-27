@@ -35,6 +35,8 @@
 QT_FORWARD_DECLARE_CLASS(QToolBar)
 QT_FORWARD_DECLARE_CLASS(QXmlStreamWriter)
 
+class QKeyEvent;
+
 namespace ads
 {
 struct DockWidgetPrivate;
@@ -66,6 +68,9 @@ private Q_SLOTS:
      */
     void setToolbarFloatingStyle(bool topLevel);
 
+	void onMaximizeShortcutTriggered();
+	void showNormalInternal();
+
 protected:
     friend class CDockContainerWidget;
     friend class CDockAreaWidget;
@@ -75,6 +80,9 @@ protected:
     friend class DockContainerWidgetPrivate;
     friend class CDockAreaTabBar;
     friend class CDockWidgetTab;
+    friend class CAutoHideTab;
+    friend class CMergedDockWidget;
+	friend class CDockAreaTitleBar;
     friend struct DockWidgetTabPrivate;
     friend struct DockAreaTitleBarPrivate;
     friend class CAutoHideDockContainer;
@@ -102,7 +110,7 @@ protected:
     /**
      * Saves the state into the given stream
      */
-    void saveState(QXmlStreamWriter& Stream) const;
+    virtual void saveState(QXmlStreamWriter& Stream) const;
 
     /**
      * This is a helper function for the dock manager to flag this widget
@@ -114,6 +122,7 @@ protected:
      * a floating widget will be created to take up the dock widget.
      */
     void flagAsUnassigned();
+
 
     /**
      * Call this function to emit a topLevelChanged() signal and to update
@@ -148,12 +157,14 @@ protected:
     bool closeDockWidgetInternal(bool ForceClose = false);
 
 	bool eventFilter(QObject* watched, QEvent* event) override;
+    void keyPressEvent(QKeyEvent* event) override;
 	virtual bool focusNextPrevChild(bool next) override;
 public:
     using Super = QFrame;
 
 	struct CustomButtonData
     {
+        QString ObjectName;
         QString Text;
         QIcon Icon;
         QString Tooltip;
@@ -162,6 +173,7 @@ public:
         CTitleBarButton* CurrentButton;
         std::function<void()> OnClicked;
         Qt::Alignment Alignment;
+        bool IgnoreDuplicates;
     };
 
     enum DockWidgetFeature
@@ -195,12 +207,24 @@ public:
                                         ///< as an independent window
         DockWidgetPinnable = 0x200,  ///< dock widget can be pinned and added to
                                      ///< an auto hide dock container
+
+        DockWidgetFullScreen = 0x400, ///< dock widget can be viewed in full screen mode when F11 key is pressed
+                                      ///< pressing F11 again will quit the full screen mode
+        DockWidgetMaximizable = 0x1000,  ///< dock widget can be *maximized* in its dock container
+                                         ///< without making the whole widget full screen.#
+                                         ///< When *maximized*, the dock area title bar wont be visible, 
+                                         ///< and the current dock widget will not change via Tab button
+                                         ///< the shortcut is Ctrl + F11
+		DockWidgetMergable = 0x2000,  ///< dock widgets can be *merged* with each other
+                                      ///< if both dock widgets have this flag set.
+		                              ///< already merged dock widgets can't be merged again,
+                                      ///< they need to be split before merging with another widget
         DefaultDockWidgetFeatures = DockWidgetClosable | DockWidgetMovable
                                     | DockWidgetFloatable | DockWidgetFocusable
-                                    | DockWidgetPinnable,
+                                    | DockWidgetPinnable | DockWidgetMergable,
         AllDockWidgetFeatures = DefaultDockWidgetFeatures
                                 | DockWidgetDeleteOnClose | CustomCloseHandling
-                                | DockWidgetIndependent,
+                                | DockWidgetIndependent | DockWidgetMaximizable | DockWidgetFullScreen,
         DockWidgetAlwaysCloseAndDelete = DockWidgetForceCloseWithArea
                                          | DockWidgetDeleteOnClose,
         GloballyLockableFeatures = DockWidgetClosable | DockWidgetMovable
@@ -348,6 +372,8 @@ public:
      * the widget has not been set.
      */
     QWidget* widget() const;
+
+    eInsertMode widgetInsertMode() const;
 
     /**
      * Returns the tab widget of this dock widget that is shown in the dock
@@ -614,17 +640,21 @@ public:
 	 * if it is checked, the on state will be shown
      */
     void addCustomButton(const QIcon& icon, bool initialCheckState,
-                                      const QString& tooltip, Qt::Alignment align,
+                         const QString& tooltip, const QString& objectName,
+                         bool ignoreDuplicates, Qt::Alignment align,
                          const std::function<void()>& onClicked);
     /**
      * Adds a button that is not checkable. The icon will be the same at all times
      */
-    void addCustomButton(const QIcon& icon, const QString& tooltip, Qt::Alignment align,
+    void addCustomButton(const QIcon& icon, const QString& tooltip, const QString& objectName,
+                         bool ignoreDuplicates, Qt::Alignment align,
                          const std::function<void()>& onClicked);
 
     const QList<CDockWidget::CustomButtonData*>& customButtons();
 
     void removeCustomButton(CDockWidget::CustomButtonData* bData);
+
+	bool isFlaggedAsUnassigned() const;
 
 public:  // reimplements QFrame -----------------------------------------------
     /**
@@ -758,6 +788,8 @@ Q_SIGNALS:
      * The features parameter gives the new value of the property.
      */
     void featuresChanged(ads::CDockWidget::DockWidgetFeatures features);
+
+    void maximizeRequested();
 };  // class DockWidget
 }  // namespace ads
 

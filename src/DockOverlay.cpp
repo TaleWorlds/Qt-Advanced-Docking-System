@@ -21,6 +21,7 @@
 //============================================================================
 #include "DockOverlay.h"
 
+#include <QApplication>
 #include <QCursor>
 #include <QDebug>
 #include <QGridLayout>
@@ -111,7 +112,7 @@ struct DockOverlayCrossPrivate
      */
     QColor defaultIconColor(CDockOverlayCross::eIconColor ColorIndex)
     {
-        QPalette pal = _this->palette();
+        QPalette pal = QApplication::palette();
         switch (ColorIndex)
         {
         case CDockOverlayCross::FrameColor:
@@ -419,6 +420,17 @@ CDockOverlay::~CDockOverlay()
 }
 
 //============================================================================
+void CDockOverlay::updateOverlayCross()
+{
+	d->Cross->d->LastDevicePixelRatio = -1.0;
+	for (auto& col : d->Cross->d->IconColors)
+	{
+		col = QColor();
+	}
+	d->Cross->updateOverlayIcons();
+}
+
+//============================================================================
 void CDockOverlay::setAllowedAreas(DockWidgetAreas areas)
 {
     if (areas == d->AllowedAreas)
@@ -639,7 +651,7 @@ void CDockOverlay::paintEvent(QPaintEvent* event)
     }
 
     QPainter painter(this);
-    QColor Color = palette().color(QPalette::Active, QPalette::Highlight);
+	QColor Color = QApplication::palette().color(QPalette::Active, QPalette::Highlight);
     QPen Pen = painter.pen();
     Pen.setColor(Color.darker(120));
     Pen.setStyle(Qt::SolidLine);

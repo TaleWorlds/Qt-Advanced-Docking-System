@@ -66,6 +66,12 @@ public:
      */
     virtual ~CDockOverlay();
 
+	
+    /**
+	 * Force-updates the overlay icons with the palette highlight color
+	 */
+	void updateOverlayCross();
+
     /**
      * Configures the areas that are allowed for docking
      */

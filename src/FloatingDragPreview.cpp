@@ -145,7 +145,12 @@ void FloatingDragPreviewPrivate::updateDropOverlays(const QPoint& GlobalPos)
     if (qApp->activeModalWidget())
     {
         return;
-    }
+	}
+    // This is probably not possible to reach, but we should still check it
+	if (ContentSourceArea && ContentSourceArea->dockContainer()->hasMaximizedWidget())
+	{
+		return;
+	}
 
     auto Containers = DockManager->dockContainers();
 	CDockContainerWidget* PrevTopContainer = TopContainer;
@@ -199,7 +204,7 @@ void FloatingDragPreviewPrivate::updateDropOverlays(const QPoint& GlobalPos)
     }
 
     // Do not show drop overlay if the dropped widget's window is minimized
-    if (DropContainer && DropContainer->window()->isMinimized())
+    if (DropContainer && DropContainer->window()->isMinimized() || DropContainer && DropContainer->hasMaximizedWidget())
     {
         ContainerOverlay->hideOverlay();
         DockAreaOverlay->hideOverlay();

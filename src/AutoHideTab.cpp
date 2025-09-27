@@ -33,6 +33,7 @@
 #include <QElapsedTimer>
 #include <QMenu>
 #include <QToolButton>
+#include <QtGui/QEvent.h>
 
 #include "AutoHideDockContainer.h"
 #include "AutoHideSideBar.h"
@@ -42,6 +43,7 @@
 #include "DockWidget.h"
 #include "FloatingDragPreview.h"
 #include "IconProvider.h"
+#include "MergedDockWidget.h"
 
 namespace ads
 {
@@ -394,6 +396,46 @@ void CAutoHideTab::contextMenuEvent(QContextMenuEvent* ev)
     Action->setEnabled(
         d->DockWidget->features().testFlag(CDockWidget::DockWidgetClosable));
 
+	auto AutoHideDockWidget = d->DockWidget;
+	if (!qobject_cast<CMergedDockWidget*>(AutoHideDockWidget)
+		&& AutoHideDockWidget->features().testFlag(CDockWidget::DockWidgetMergable))
+	{
+		Menu.addSeparator();
+		auto vmenu = Menu.addMenu(tr("Merge with vertically..."));
+		for (auto dw : AutoHideDockWidget->dockManager()->dockWidgetsMap())
+		{
+			if (dw != AutoHideDockWidget && !qobject_cast<CMergedDockWidget*>(dw)
+				&& dw->features().testFlag(CDockWidget::DockWidgetMergable))
+			{
+				Action = vmenu->addAction(dw->windowTitle(), this, SLOT(mergeDockWidget()));
+				QPair<void*, Qt::Orientation> data;
+				data.first = (void*)dw;
+				data.second = Qt::Vertical;
+				Action->setData(QVariant::fromValue(data));
+				Action->setEnabled(dw->isAutoHide() || !dw->dockContainer()->hasMaximizedWidget());
+			}
+		}
+		auto hmenu = Menu.addMenu(tr("Merge with horizontally..."));
+		for (auto dw : AutoHideDockWidget->dockManager()->dockWidgetsMap())
+		{
+			if (dw != AutoHideDockWidget && !qobject_cast<CMergedDockWidget*>(dw)
+				&& dw->features().testFlag(CDockWidget::DockWidgetMergable))
+			{
+				Action = hmenu->addAction(dw->windowTitle(), this, SLOT(mergeDockWidget()));
+				QPair<void*, Qt::Orientation> data;
+				data.first = (void*)dw;
+				data.second = Qt::Horizontal;
+				Action->setData(QVariant::fromValue(data));
+                Action->setEnabled(dw->isAutoHide() || !dw->dockContainer()->hasMaximizedWidget());
+			}
+		}
+	}
+	else if (qobject_cast<CMergedDockWidget*>(AutoHideDockWidget))
+	{
+		Menu.addSeparator();
+		Action = Menu.addAction(tr("Split widgets"), this, SLOT(splitDockWidget()));
+	}
+
     Menu.exec(ev->globalPos());
 }
 
@@ -416,9 +458,48 @@ void CAutoHideTab::onAutoHideToActionClicked()
     d->DockWidget->setAutoHide(true, (SideBarLocation)Location);
 }
 
+//============================================================================
 void CAutoHideTab::onCloseButtonClicked()
 {
     d->DockWidget->requestCloseDockWidget();
+}
+
+//============================================================================
+void CAutoHideTab::mergeDockWidget()
+{
+	auto AutoHideDockContainer = d->DockWidget->autoHideDockContainer();
+	auto AutoHideDockWidget = AutoHideDockContainer->dockWidget();
+	auto location = AutoHideDockContainer->sideBarLocation();
+	auto sidebar = AutoHideDockContainer->autoHideSideBar();
+	QAction* senderAct = (QAction*)QObject::sender();
+	QPair<void*, Qt::Orientation> dataAct = senderAct->data().value<QPair<void*, Qt::Orientation>>();
+	CDockWidget* dw = (CDockWidget*)dataAct.first;
+	CDockWidget* thisDw = AutoHideDockWidget;
+	int oldSize = AutoHideDockContainer->getSize();
+	CDockManager* dockMgr = thisDw->dockManager();
+	CDockAreaWidget* dockAreaWid = AutoHideDockContainer->dockAreaWidget();
+	auto merged = new CMergedDockWidget(thisDw, dw, dataAct.second, dockAreaWid);
+
+	auto NewAutoHideDockContainer = dockMgr->addAutoHideDockWidget(location, merged);
+	dockMgr->removeDockWidget(AutoHideDockWidget);
+	dockMgr->removeDockWidget(dw);
+	AutoHideDockWidget->hide();
+	AutoHideDockWidget->flagAsUnassigned();
+	dw->hide();
+	dw->flagAsUnassigned();
+	NewAutoHideDockContainer->setSize(oldSize);
+	NewAutoHideDockContainer->collapseView(false);
+	dockMgr->restartViewMenu();
+}
+
+//============================================================================
+void CAutoHideTab::splitDockWidget()
+{
+	auto AutoHideDockContainer = d->DockWidget->autoHideDockContainer();
+	auto AutoHideDockWidget = AutoHideDockContainer->dockWidget();
+	CMergedDockWidget* thisDw = (CMergedDockWidget*)AutoHideDockWidget;
+	CDockWidget* dockWidget1, * dockWidget2;
+	thisDw->splitWidgets(dockWidget1, dockWidget2);
 }
 
 //============================================================================

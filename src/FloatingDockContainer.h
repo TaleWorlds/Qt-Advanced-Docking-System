@@ -28,12 +28,12 @@
 //============================================================================
 //                                   INCLUDES
 //============================================================================
-#include <QDockWidget>
+#include <QMainWindow>
 #include <QRubberBand>
 #include <QWidget>
 
 #include "ads_globals.h"
-#define tFloatingWidgetBase QDockWidget
+#define tFloatingWidgetBase QMainWindow
 
 class CDockingStateReader;
 class QStatusBar;
@@ -197,7 +197,6 @@ protected:  // reimplements QWidget
     virtual void resizeEvent(QResizeEvent* event) override;
     virtual bool event(QEvent* e) override;
 
-    void region(const QPoint& cursorGlobalPoint);
     virtual void mousePressEvent(QMouseEvent* event) override;
     virtual void mouseReleaseEvent(QMouseEvent* event) override;
     virtual void mouseMoveEvent(QMouseEvent* eevent) override;

@@ -109,7 +109,7 @@ void DockAreaTabBarPrivate::updateTabs()
             TabWidget->setActiveTab(true);
             TempTabWidgets.insert(TabWidget);
             TempTabWidget.insert(TabWidget);
-            QTimer::singleShot(0, TabWidget, [this] {
+            QTimer::singleShot(0, _this, [this] {
                 for (auto TempTabWidget : TempTabWidgets)
                 {
                     if (TempTabWidget)

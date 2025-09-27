@@ -27,10 +27,13 @@
 #include "DockWidget.h"
 #include "DockWidgetTab.h"
 #include "FloatingDockContainer.h"
-#include "FloatingWidgetTitleBar.h"
 
 namespace ads
 {
+#ifndef ads_CDockWidget_findParent
+#define ads_CDockWidget_findParent
+template ADS_EXPORT CDockWidget* internal::findParent(const QWidget* w);
+#endif
 static const char* const FocusedDockWidgetProperty = "FocusedDockWidget";
 
 /**
@@ -80,26 +83,6 @@ static void updateDockAreaFocusStyle(CDockAreaWidget* DockArea, bool Focused)
 	DockArea->titleBar()->update();
 	DockArea->update();
 }
-
-//===========================================================================
-/*#ifdef Q_OS_LINUX*/
-static void updateFloatingWidgetFocusStyle(CFloatingDockContainer* FloatingWidget,
-                                           bool Focused)
-{
-    if (FloatingWidget->hasNativeTitleBar())
-    {
-        return;
-    }
-    CFloatingWidgetTitleBar* TitleBar =
-        qobject_cast<CFloatingWidgetTitleBar*>(FloatingWidget->titleBarWidget());
-    if (!TitleBar)
-    {
-        return;
-    }
-    TitleBar->setProperty("focused", Focused);
-    TitleBar->updateStyle();
-}
-/*#endif*/
 
 //============================================================================
 DockFocusControllerPrivate::DockFocusControllerPrivate(
@@ -174,17 +157,8 @@ void DockFocusControllerPrivate::updateDockWidgetFocus(CDockWidget* DockWidget)
     // depending on the current focus state
     if (FloatingWidget != NewFloatingWidget)
     {
-        if (FloatingWidget)
-        {
-            updateFloatingWidgetFocusStyle(FloatingWidget, false);
-        }
         FloatingWidget = NewFloatingWidget;
-
-        if (FloatingWidget)
-        {
-            updateFloatingWidgetFocusStyle(FloatingWidget, true);
         }
-    }
     /*#endif*/
 
     if (old == DockWidget && !ForceFocusChangedSignal)
