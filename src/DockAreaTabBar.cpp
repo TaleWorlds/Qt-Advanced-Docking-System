@@ -522,6 +522,11 @@ int CDockAreaTabBar::tabAt(const QPoint& Pos) const
         return TabInvalidIndex;
     }
 
+	if (!tab(0))
+	{
+		return TabDefaultInsertIndex;
+	}
+
     if (Pos.x() < tab(0)->geometry().x())
     {
         return -1;
@@ -529,7 +534,7 @@ int CDockAreaTabBar::tabAt(const QPoint& Pos) const
 
     for (int i = 0; i < count(); ++i)
     {
-        if (tab(i)->geometry().contains(Pos))
+        if (tab(i) && tab(i)->geometry().contains(Pos))
         {
             return i;
         }

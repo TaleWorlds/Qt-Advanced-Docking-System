@@ -461,7 +461,18 @@ public:
      * \return Return the found dock widget or nullptr if a dock widget with the
      * given name is not registered
      */
-    CDockWidget* findDockWidget(const QString& ObjectName) const;
+	CDockWidget* findDockWidget(const QString& ObjectName) const;
+
+	/**
+     * Checks whether the following object name is repeated on the state file
+     */
+	bool isDockWidgetRestored(const QString& ObjectName) const;
+	
+	/**
+     * Marks the following object name with the given widget so that
+     * no more widget can be created with that name
+     */
+	void markDockWidgetRestored(const QString& ObjectName, CDockWidget* widget);
 
     /**
      * Remove the given Dock from the dock manager

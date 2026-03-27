@@ -246,18 +246,22 @@ CAutoHideTab::CAutoHideTab(QWidget* parent)
 {
     setAttribute(Qt::WA_NoMousePropagation, false);
     setFocusPolicy(Qt::NoFocus);
-    d->CloseButton = new QToolButton(this);
-    QHBoxLayout* layout = new QHBoxLayout(this);
-    layout->setContentsMargins(0, 0, 0, 0);
-    layout->setSpacing(0);
-    setContentsMargins(0, 0, 0, 0);
-    layout->setAlignment(Qt::AlignRight | Qt::AlignTop);
-	layout->addWidget(d->CloseButton); 
-    d->CloseButton->setContentsMargins(0, 0, 0, 0);
-    d->CloseButton->setIcon(CDockManager::iconProvider().customIcon(DockAreaCloseIcon));
-    d->CloseButton->setFixedSize(10, 10);
-    d->CloseButton->setAutoRaise(true);
-    QObject::connect(d->CloseButton, &QToolButton::clicked, this, &CAutoHideTab::onCloseButtonClicked);
+	bool hasCloseButton = false;
+	if (hasCloseButton)
+	{
+		d->CloseButton = new QToolButton(this);
+		QHBoxLayout* layout = new QHBoxLayout(this);
+		layout->setContentsMargins(0, 0, 0, 0);
+		layout->setSpacing(0);
+		setContentsMargins(0, 0, 0, 0);
+		layout->setAlignment(Qt::AlignRight | Qt::AlignTop);
+		layout->addWidget(d->CloseButton);
+		d->CloseButton->setContentsMargins(0, 0, 0, 0);
+		d->CloseButton->setIcon(CDockManager::iconProvider().customIcon(DockAreaCloseIcon));
+		d->CloseButton->setFixedSize(10, 10);
+		d->CloseButton->setAutoRaise(true);
+		QObject::connect(d->CloseButton, &QToolButton::clicked, this, &CAutoHideTab::onCloseButtonClicked);
+	}
 }
 
 //============================================================================
@@ -648,10 +652,20 @@ QSize CAutoHideTab::sizeHint() const
     }
 	QFontMetrics fm = fontMetrics();
 	QSize sz = fm.size(Qt::TextShowMnemonic, s);
-    if (sz.width() >= 40)
+	if (d->SideBar && d->SideBar->orientation() == Qt::Horizontal)
 	{
-		inheritedSize.setWidth(inheritedSize.width() + 12);
-    }
+		if (sz.width() >= 40)
+		{
+			inheritedSize.setWidth(inheritedSize.width() + 12);
+		}
+	}
+	else if (d->SideBar && d->SideBar->orientation() == Qt::Vertical)
+	{
+		if (sz.height() >= 40)
+		{
+			inheritedSize.setHeight(inheritedSize.height() + 12);
+		}
+	}
     return inheritedSize;
 }
 

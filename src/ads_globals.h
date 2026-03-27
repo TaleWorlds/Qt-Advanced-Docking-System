@@ -84,7 +84,7 @@ class CDockWidget;
 class CTitleBarButton;
 class CElidingLabel;
 
-enum DockWidgetArea
+enum DockWidgetArea : uint32_t
 {
 	NoDockWidgetArea = 0x00,
 	LeftDockWidgetArea = 0x01,
@@ -160,7 +160,7 @@ enum eBitwiseOperator
 /**
  * Each dock container supports 4 sidebars
  */
-enum SideBarLocation
+enum SideBarLocation : uint32_t
 {
 	SideBarTop,
 	SideBarLeft,

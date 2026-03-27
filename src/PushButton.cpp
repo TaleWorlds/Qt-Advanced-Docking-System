@@ -17,52 +17,52 @@
 
 namespace ads
 {
-QSize CPushButton::sizeHint() const
-{
-    QSize sh = QPushButton::sizeHint();
+	QSize CPushButton::sizeHint() const
+	{
+		QSize sh = QPushButton::sizeHint();
 
-    if (m_Orientation != CPushButton::Horizontal)
-    {
-        sh.transpose();
-    }
+		if (m_Orientation != CPushButton::Horizontal)
+		{
+			sh.transpose();
+		}
 
-    return sh;
-}
+		return sh;
+	}
 
-void CPushButton::paintEvent(QPaintEvent* event)
-{
-    Q_UNUSED(event);
+	void CPushButton::paintEvent(QPaintEvent* event)
+	{
+		Q_UNUSED(event);
 
-    QStylePainter painter(this);
-    QStyleOptionButton option;
-    initStyleOption(&option);
+		QStylePainter painter(this);
+		QStyleOptionButton option;
+		initStyleOption(&option);
 
-    if (m_Orientation == CPushButton::VerticalTopToBottom)
-    {
-        painter.rotate(90);
-        painter.translate(0, -1 * width());
-        option.rect = option.rect.transposed();
-    }
-    else if (m_Orientation == CPushButton::VerticalBottomToTop)
-    {
-        painter.rotate(-90);
-        painter.translate(-1 * height(), 0);
-        option.rect = option.rect.transposed();
-    }
+		if (m_Orientation == CPushButton::VerticalTopToBottom)
+		{
+			painter.rotate(90);
+			painter.translate(0, -1 * width());
+			option.rect = option.rect.transposed();
+		}
+		else if (m_Orientation == CPushButton::VerticalBottomToTop)
+		{
+			painter.rotate(-90);
+			painter.translate(-1 * height(), 0);
+			option.rect = option.rect.transposed();
+		}
 
-    painter.drawControl(QStyle::CE_PushButton, option);
-}
+		painter.drawControl(QStyle::CE_PushButton, option);
+	}
 
-CPushButton::Orientation CPushButton::buttonOrientation() const
-{
-    return m_Orientation;
-}
+	CPushButton::Orientation CPushButton::buttonOrientation() const
+	{
+		return m_Orientation;
+	}
 
-void CPushButton::setButtonOrientation(Orientation orientation)
-{
-    m_Orientation = orientation;
-    updateGeometry();
-}
+	void CPushButton::setButtonOrientation(Orientation orientation)
+	{
+		m_Orientation = orientation;
+		updateGeometry();
+	}
 }  // namespace ads
 
 //---------------------------------------------------------------------------

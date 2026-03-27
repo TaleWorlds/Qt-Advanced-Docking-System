@@ -1105,7 +1105,12 @@ bool CDockAreaWidget::restoreState(CDockingStateReader& s,
         if (!DockWidget || Testing)
         {
             continue;
-        }
+		}
+		if (DockManager->isDockWidgetRestored(ObjectName.toString()))
+		{
+			continue;
+		}
+		DockManager->markDockWidgetRestored(ObjectName.toString(), DockWidget);
 
         ADS_PRINT("Dock Widget found - parent " << DockWidget->parent());
         if (DockWidget->autoHideDockContainer())
@@ -1200,6 +1205,16 @@ bool CDockAreaWidget::restoreState(CDockingStateReader& s,
 			{
 				continue;
 			}
+			if (DockManager->isDockWidgetRestored(widget1ObjName))
+			{
+				continue;
+			}
+			DockManager->markDockWidgetRestored(widget1ObjName, DockWidget1);
+			if (DockManager->isDockWidgetRestored(widget2ObjName))
+			{
+				continue;
+			}
+			DockManager->markDockWidgetRestored(widget2ObjName, DockWidget2);
 
 			ADS_PRINT("Dock Widget1 found - parent " << DockWidget1->parent());
 			ADS_PRINT("Dock Widget2 found - parent " << DockWidget2->parent());

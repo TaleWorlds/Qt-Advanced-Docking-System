@@ -125,7 +125,8 @@ struct DockManagerPrivate
     QList<CDockContainerWidget*> Containers;
     CDockOverlay* ContainerOverlay;
     CDockOverlay* DockAreaOverlay;
-    QMap<QString, CDockWidget*> DockWidgetsMap;
+	QMap<QString, CDockWidget*> DockWidgetsMap;
+	QMap<QString, CDockWidget*> RestoredDockWidgetsMap;
     QMap<QString, QByteArray> Perspectives;
     QMap<QString, QMenu*> ViewMenuGroups;
     QMenu* ViewMenu;
@@ -140,8 +141,8 @@ struct DockManagerPrivate
     QSize ToolBarIconSizeDocked = QSize(16, 16);
     QSize ToolBarIconSizeFloating = QSize(24, 24);
     CDockWidget::DockWidgetFeatures LockedDockWidgetFeatures;
-    WindowActivateEventFilter* WindowActivateEventFilterObj;
-	PaletteEventFilter* PaletteEventFilterObj;
+    WindowActivateEventFilter* WindowActivateEventFilterObj = nullptr;
+	PaletteEventFilter* PaletteEventFilterObj = nullptr;
     /**
      * Private data constructor
      */
@@ -255,8 +256,14 @@ DockManagerPrivate::DockManagerPrivate(CDockManager* _public)
 //============================================================================
 DockManagerPrivate::~DockManagerPrivate()
 {
-	delete WindowActivateEventFilterObj;
-	delete PaletteEventFilterObj;
+	if (WindowActivateEventFilterObj)
+	{
+		delete WindowActivateEventFilterObj;
+	}
+	if (PaletteEventFilterObj)
+	{
+		delete PaletteEventFilterObj;
+	}
 }
 
 //============================================================================
@@ -698,6 +705,7 @@ bool DockManagerPrivate::restoreState(const QByteArray& State, int version)
         ADS_PRINT("checkFormat: Error checking format!!!!!!!");
         return false;
 	}
+	RestoredDockWidgetsMap.clear();
 	// minimize maximized containers
 	_this->minimizeDockWidgets();
     // Split merged widgets since we dont handle the merged widget cases in restore state
@@ -709,8 +717,8 @@ bool DockManagerPrivate::restoreState(const QByteArray& State, int version)
     {
         ADS_PRINT("restoreState: Error restoring state!!!!!!!");
         return false;
-    }
-
+	}
+	RestoredDockWidgetsMap.clear();
     restoreDockWidgetsOpenState();
     restoreDockAreasIndices();
     emitTopLevelEvents();
@@ -1274,6 +1282,18 @@ CDockAreaWidget* CDockManager::addDockWidgetTabToArea(CDockWidget* Dockwidget, C
 CDockWidget* CDockManager::findDockWidget(const QString& ObjectName) const
 {
     return d->DockWidgetsMap.value(ObjectName, nullptr);
+}
+
+//============================================================================
+bool CDockManager::isDockWidgetRestored(const QString& ObjectName) const
+{
+	return d->RestoredDockWidgetsMap.constFind(ObjectName) != d->RestoredDockWidgetsMap.constEnd();
+}
+
+//============================================================================
+void CDockManager::markDockWidgetRestored(const QString& ObjectName, CDockWidget* widget)
+{
+	d->RestoredDockWidgetsMap[ObjectName] = widget;
 }
 
 //============================================================================

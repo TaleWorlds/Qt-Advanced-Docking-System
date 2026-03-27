@@ -1236,7 +1236,12 @@ bool DockContainerWidgetPrivate::restoreSideBar(CDockingStateReader& s,
         if (!DockWidget || Testing)
         {
             continue;
-        }
+		}
+		if (DockManager->isDockWidgetRestored(Name.toString()))
+		{
+			continue;
+		}
+		DockManager->markDockWidgetRestored(Name.toString(), DockWidget);
 
         auto SideBar = _this->autoHideSideBar(Area);
         CAutoHideDockContainer* AutoHideContainer;
@@ -1343,6 +1348,17 @@ bool DockContainerWidgetPrivate::restoreSideBar(CDockingStateReader& s,
 			{
 				continue;
 			}
+			if (DockManager->isDockWidgetRestored(widget1ObjName))
+			{
+				continue;
+			}
+			DockManager->markDockWidgetRestored(widget1ObjName, DockWidget1);
+			if (DockManager->isDockWidgetRestored(widget2ObjName))
+			{
+				continue;
+			}
+			DockManager->markDockWidgetRestored(widget2ObjName, DockWidget2);
+
 			auto SideBar = _this->autoHideSideBar(Area);
             auto merged = new CMergedDockWidget(DockWidget1, DockWidget2, orient, DockManager);
 			auto NewAutoHideDockContainer = DockManager->addAutoHideDockWidget(Area, merged);
